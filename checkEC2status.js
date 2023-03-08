@@ -15,8 +15,8 @@ const checkEC2Status = (instanceId, ec2) => {
         if (state === "running") {
           res();
         } else {
-          setTimeout(() => res(checkEC2Status(instanceId, ec2)), 10000);
-          // wait 10 seconds and call the checkInstanceStatus function again
+          setTimeout(() => res(checkEC2Status(instanceId, ec2)), 3000);
+          // wait 3 seconds and call the checkInstanceStatus function again
         }
       }
     });

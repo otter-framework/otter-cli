@@ -16,7 +16,7 @@ const checkStackStatus = async (cloudFormation, stackName) => {
       } else if (stackStatus.endsWith("_IN_PROGRESS")) {
         setTimeout(
           () => res(checkStackStatus(cloudFormation, stackName)),
-          5000
+          3000
         );
       } else {
         console.log(`Stack creation failed with status ${stackStatus}`);

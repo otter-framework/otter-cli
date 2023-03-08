@@ -143,6 +143,7 @@ Resources:
                     statusCode: 200,
                   };
                 };
+
       Role: !GetAtt
         - DisconnectHandlerServiceRole2301
         - Arn

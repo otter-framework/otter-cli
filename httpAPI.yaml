@@ -2,6 +2,7 @@ Resources:
   RoomCountsTable2301:
     Type: "AWS::DynamoDB::Table"
     Properties:
+      TableName: "RoomCountsTable2301"
       KeySchema:
         - AttributeName: roomId
           KeyType: HASH
@@ -33,9 +34,25 @@ Resources:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ApiGateway
-      RouteKey: "POST /createRoom/{id}"
+      RouteKey: "POST /createRoom"
       AuthorizationType: NONE
-      Target: !Sub "integrations/${CreateRoomPostIntegration}"
+      Target: !Sub "integrations/${CreateRoomIntegration}"
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${DefaultRouteIntegration}"
+
+  DefaultRouteIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DefaultLambdaFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
 
   RoomsGetIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -45,7 +62,7 @@ Resources:
       IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RoomsGetFunction.Arn}/invocations"
       PayloadFormatVersion: "2.0"
 
-  CreateRoomPostIntegration:
+  CreateRoomIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref ApiGateway
@@ -53,39 +70,79 @@ Resources:
       IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateRoomFunction.Arn}/invocations"
       PayloadFormatVersion: "2.0"
 
+  DefaultLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          exports.handler = async (event, context) => {
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Unknown route. Supported routes include GET /rooms/roomId and POST /createRoom' })
+            };
+          }
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+
   RoomsGetFunction:
     Type: AWS::Lambda::Function
     Properties:
       Code:
         ZipFile: |
-          exports.handler = async (event) => {
-          console.log(event);
-          const response = {
-            statusCode: 200,
-            body: JSON.stringify('Success from the get rooms route'),
-          };
-          return response;
-          };
-      Handler: index.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: nodejs14.x
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          const table = "RoomCountsTable2301";
 
-  CreateRoomFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Code:
-        ZipFile: |
-          exports.handler = async (event) => {
-          console.log(event);
-          const response = {
-            statusCode: 200,
-            body: JSON.stringify('Success from the POST createRoom route'),
+          exports.handler = async (event, context) => {
+            try {
+              const roomId = event.pathParameters.id;
+
+              const getItemParams = {
+                TableName: table,
+                Key: {
+                  roomId: roomId,
+                }
+              };
+
+              const existingItem = await ddb.get(getItemParams).promise();
+
+              if (existingItem.Item) {
+                // If item already exists, return info about the item
+                return {
+                  statusCode: 200,
+                  body: JSON.stringify({ message: 'Room info:', item: existingItem.Item })
+                };
+              } else {
+                return {
+                  statusCode: 400,
+                  body: JSON.stringify({ message: 'Room does not exist' })
+                };
+              }
+            } catch (error) {
+              console.error('Error adding or retrieving item from DynamoDB table: ', error);
+              return {
+                statusCode: 500,
+                body: JSON.stringify({ error: 'Could not add or retrieve item from DynamoDB table' })
+              };
+            }
           };
-          return response;
-          };
+
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref RoomCountsTable2301
       Handler: index.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: nodejs14.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+      - LambdaExecutionRole
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -111,6 +168,88 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: "arn:aws:logs:*:*:*"
+
+  LambdaDefaultPolicy2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:Query
+              - dynamodb:GetItem
+              - dynamodb:Scan
+              - dynamodb:ConditionCheckItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - !GetAtt
+                - RoomCountsTable2301
+                - Arn
+              - !Ref "AWS::NoValue"
+        Version: 2012-10-17
+      PolicyName: LambdaDefaultPolicy2301
+      Roles:
+        - !Ref LambdaExecutionRole
+
+  CreateRoomFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          const table = "RoomCountsTable2301";
+
+          exports.handler = async (event, context) => {
+          try {
+            const roomId = AWS.util.uuid.v4()
+            console.log(roomId, "ROOM ID HERE");
+            const now = new Date();
+            const utc = now.toUTCString();
+            const config = event.body ? JSON.parse(event.body) : {};
+
+            const itemParams = {
+              TableName: table,
+              Item: {
+                roomId: roomId, 
+                unique_name: config.uniqueName || '',
+                created_at: utc,
+                updated_at: utc,
+                status: "open",
+              }
+            };
+            
+            await ddb.put(itemParams).promise();
+
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Item added to DynamoDB table', id: roomId })
+            };
+            } catch (error) {
+            console.error('Error adding item to DynamoDB table: ', error);
+            return {
+              statusCode: 500,
+              body: JSON.stringify({ error: error })
+            };
+            }
+          };
+
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref RoomCountsTable2301
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+      - LambdaExecutionRole
+
   stageDev:
     Type: "AWS::ApiGatewayV2::Stage"
     Properties:
@@ -142,6 +281,25 @@ Resources:
       Action: "lambda:InvokeFunction"
       FunctionName: !GetAtt
         - CreateRoomFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref ApiGateway
+          - /*/*
+  HTTPAPIDefaultLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - DefaultLambdaFunction
         - Arn
       Principal: apigateway.amazonaws.com
       SourceArn: !Join
