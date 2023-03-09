@@ -2,6 +2,7 @@ Resources:
   ConnectionsTable2301:
     Type: "AWS::DynamoDB::Table"
     Properties:
+      TableName: ConnectionsTable2301
       KeySchema:
         - AttributeName: connectionId
           KeyType: HASH
@@ -11,8 +12,11 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+
   ConnectHandlerServiceRole2301:
     Type: "AWS::IAM::Role"
     Properties:
@@ -674,3 +678,8 @@ Resources:
       PolicyName: manageConnections2301
       Roles:
         - !Ref MessageHandlerServiceRole2301
+Outputs:
+  ConnectionsTableStreamArn:
+    Value: !GetAtt ConnectionsTable2301.StreamArn
+    Export:
+      Name: !Sub "${AWS::StackName}-StreamArn"

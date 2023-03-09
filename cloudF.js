@@ -15,7 +15,6 @@ const setupCoturn = require("./setupCoturn.js");
 const checkEC2Status = require("./checkEC2status.js");
 const createIAMEC2Role = require("./createIAMEC2role.js");
 const associateIam = require("./associateiam.js");
-const provisionAPI = require("./provisionAPI.js");
 const emoji = require("node-emoji");
 const checkMark = emoji.get("white_check_mark");
 
@@ -84,12 +83,11 @@ rl.question("\nEnter your AWS access key ID: ", (accessKeyId) => {
         });
 
         const masterFunc = async () => {
-          provisionResources(
+          await provisionResources(
             cloudFormation,
             SIGNAL_STACK_NAME,
             "./signaling.yaml"
           );
-          provisionResources(cloudFormation, API_STACK_NAME, "./httpAPI.yaml");
 
           let spinner = generateSpinner("Configuring EC2 permissions...");
           const iamARN = await createIAMEC2Role(iam);
@@ -115,6 +113,12 @@ rl.question("\nEnter your AWS access key ID: ", (accessKeyId) => {
           await checkStackStatus(cloudFormation, SIGNAL_STACK_NAME);
           spinner.stop();
           console.log("Signaling Server resources deployed" + checkMark);
+
+          await provisionResources(
+            cloudFormation,
+            API_STACK_NAME,
+            "./httpAPI.yaml"
+          );
 
           spinner = generateSpinner("Deploying HTTP API resources...");
           await checkStackStatus(cloudFormation, API_STACK_NAME);

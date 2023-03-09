@@ -1,3 +1,7 @@
+# Parameters:
+#   SignalingStackName:
+#     Type: String
+#     Default: SignalingStack
 Resources:
   RoomCountsTable2301:
     Type: "AWS::DynamoDB::Table"
@@ -14,6 +18,178 @@ Resources:
         WriteCapacityUnits: 5
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+
+  DynamoDBLambdaPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "DynamoDBLambdaPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "dynamodb:DescribeStream"
+              - "dynamodb:GetRecords"
+              - "dynamodb:GetShardIterator"
+              - "dynamodb:ListStreams"
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ConnectionsTable2301/stream/*"
+          - Effect: Allow
+            Action:
+              - "dynamodb:UpdateItem"
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${RoomCountsTable2301}"
+      Roles:
+        - !Ref CrossTableLambdaExecutionRole
+
+  TableChangeLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+          import { unmarshall } from '@aws-sdk/util-dynamodb';
+          import { DynamoDBDocumentClient, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+
+          const TABLE_NAME = 'rooms';
+          const REGION = process.env.AWS_REGION || 'us-east-2';
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const updateRoomStatusById = async (id, status) => {
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { id },
+              UpdateExpression: 'set #current_status = :s',
+              ExpressionAttributeNames: { '#current_status': 'status' },
+              ExpressionAttributeValues: { ':s': status },
+            };
+
+            await dynamo.send(new UpdateCommand(params));
+          };
+
+          const getRoomStatusById = async (id) => {
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { id },
+            };
+
+            const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            const roomResource = dataFromDatabase.Item ? dataFromDatabase.Item : null;
+
+            if (roomResource && roomResource.status) return roomResource.status;
+
+            return null;
+          };
+
+          export const getNewStatusOnConnect = (prevStatus) => {
+            let newStatus;
+            switch (prevStatus) {
+              case 'open':
+                newStatus = 'occupied';
+                break;
+              case 'occupied':
+                newStatus = 'full';
+                break;
+              default:
+                throw new Error(`Cannot change the status from ${prevStatus}`);
+            }
+
+            return newStatus;
+          };
+
+          export const getNewStatusOnDisconnect = (prevStatus) => {
+            let newStatus;
+            switch (prevStatus) {
+              case 'full':
+                newStatus = 'occupied';
+                break;
+              case 'occupied':
+                newStatus = 'closed';
+                break;
+              default:
+                throw new Error(`Cannot change the status from ${prevStatus}`);
+            }
+
+            return newStatus;
+          };
+
+          export const lambdaHandler = async (event) => {
+            let roomId;
+            const record = event.Records[0];
+
+            console.log('event: ', event);
+            console.log('records:', event.Records);
+            console.log('record length:', event.Records.length);
+            console.log('Event name:', record.eventName);
+            console.log('new image: ', record.dynamodb.NewImage);
+            console.log('old image: ', record.dynamodb.OldImage);
+            const dynamoDbRecord = record.dynamodb.NewImage;
+            const recordData = unmarshall(dynamoDbRecord);
+
+            // Guard clauses before talking with db
+            if (record.eventName === 'INSERT') return;
+            if (!recordData.peerId) {
+              console.log('Database change does not have a room ID attach to it. Abort.');
+              return;
+            }
+
+            roomId = recordData.peerId;
+            console.log('ROOM ID CAPTURED: ', roomId);
+
+            try {
+              const prevStatus = await getRoomStatusById(roomId);
+              if (!prevStatus) {
+                console.log(`The status of the room ${roomId} is missing. Abort.`);
+                return;
+              }
+
+              let newStatus;
+
+              switch (record.eventName) {
+                case 'MODIFY':
+                  // a peer connected with a specific room
+                  newStatus = getNewStatusOnConnect(prevStatus);
+                  break;
+                case 'REMOVE':
+                  // a peer disconnect from a specific room
+                  newStatus = getNewStatusOnDisconnect(prevStatus);
+                  break;
+                default:
+                  return;
+              }
+              await updateRoomStatusById(roomId, newStatus);
+              console.log('Room status updated!');
+            } catch (err) {
+              console.log('Error while updating the database:', err);
+            }
+          };
+
+      Role: !GetAtt
+        - CrossTableLambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref RoomCountsTable2301
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - DynamoDBLambdaPolicy
+      - CrossTableLambdaExecutionRole
+
+  LambdaToDynamoDBStreamMapping:
+    Type: "AWS::Lambda::EventSourceMapping"
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn:
+        Fn::ImportValue: "NewTestSignalStack-StreamArn"
+      FunctionName: !Ref TableChangeLambdaFunction
+      StartingPosition: LATEST
 
   ApiGateway:
     Type: AWS::ApiGatewayV2::Api
@@ -143,6 +319,31 @@ Resources:
     DependsOn:
       - LambdaDefaultPolicy2301
       - LambdaExecutionRole
+
+  CrossTableLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: "CloudWatchLogsPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
