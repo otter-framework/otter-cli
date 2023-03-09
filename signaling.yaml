@@ -86,7 +86,7 @@ Resources:
         Variables:
           table: !Ref ConnectionsTable2301
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - ConnectHandlerServiceRoleDefaultPolicy2301
       - ConnectHandlerServiceRole2301
@@ -155,7 +155,7 @@ Resources:
         Variables:
           table: !Ref ConnectionsTable2301
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - DisconnectHandlerServiceRoleDefaultPolicy2301
       - DisconnectHandlerServiceRole2301
@@ -367,7 +367,7 @@ Resources:
         Variables:
           table: !Ref ConnectionsTable2301
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - MessageHandlerServiceRoleDefaultPolicy2301
       - MessageHandlerServiceRole2301
@@ -462,7 +462,7 @@ Resources:
         - DefaultHandlerServiceRole2301
         - Arn
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - DefaultHandlerServiceRoleDefaultPolicy2301
       - DefaultHandlerServiceRole2301

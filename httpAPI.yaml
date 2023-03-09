@@ -176,7 +176,7 @@ Resources:
         Variables:
           table: !Ref RoomCountsTable2301
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - DynamoDBLambdaPolicy
       - CrossTableLambdaExecutionRole
@@ -261,7 +261,7 @@ Resources:
         - LambdaExecutionRole
         - Arn
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - LambdaDefaultPolicy2301
 
@@ -315,7 +315,7 @@ Resources:
         Variables:
           table: !Ref RoomCountsTable2301
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - LambdaDefaultPolicy2301
       - LambdaExecutionRole
@@ -446,7 +446,7 @@ Resources:
         Variables:
           table: !Ref RoomCountsTable2301
       Handler: index.handler
-      Runtime: nodejs14.x
+      Runtime: nodejs18.x
     DependsOn:
       - LambdaDefaultPolicy2301
       - LambdaExecutionRole
