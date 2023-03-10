@@ -1,0 +1,392 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  ecsTaskExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:GetRepositoryPolicy"
+                  - "ecr:DescribeRepositories"
+                  - "ecr:ListImages"
+                  - "ecr:DescribeImages"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+        - PolicyName: CloudWatchLogsFullAccess
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogGroups"
+                  - "logs:DescribeLogStreams"
+                  - "logs:GetLogEvents"
+                  - "logs:FilterLogEvents"
+                Resource: "*"
+        # - PolicyName: AdditionalPermissions
+        #   PolicyDocument:
+        #     Statement:
+        #       - Effect: Allow
+        #         Action:
+        #           - "application-autoscaling:DeleteScalingPolicy"
+        #           - "application-autoscaling:DeregisterScalableTarget"
+        #           - "application-autoscaling:DescribeScalableTargets"
+        #           - "application-autoscaling:DescribeScalingActivities"
+        #           - "application-autoscaling:DescribeScalingPolicies"
+        #           - "application-autoscaling:PutScalingPolicy"
+        #           - "application-autoscaling:RegisterScalableTarget"
+        #           - "appmesh:DescribeVirtualGateway"
+        #           - "appmesh:DescribeVirtualNode"
+        #           - "appmesh:ListMeshes"
+        #           - "appmesh:ListVirtualGateways"
+        #           - "appmesh:ListVirtualNodes"
+        #           - "autoscaling:CreateAutoScalingGroup"
+        #           - "autoscaling:CreateLaunchConfiguration"
+        #           - "autoscaling:DeleteAutoScalingGroup"
+        #           - "autoscaling:DeleteLaunchConfiguration"
+        #           - "autoscaling:Describe*"
+        #           - "autoscaling:UpdateAutoScalingGroup"
+        #           - "cloudformation:CreateStack"
+        #           - "cloudformation:DeleteStack"
+        #           - "cloudformation:DescribeStack*"
+        #           - "cloudformation:UpdateStack"
+        #           - "cloudwatch:DeleteAlarms"
+        #           - "cloudwatch:DescribeAlarms"
+        #           - "cloudwatch:GetMetricStatistics"
+        #           - "cloudwatch:PutMetricAlarm"
+        #           - "codedeploy:BatchGetApplicationRevisions"
+        #           - "codedeploy:BatchGetApplications"
+        #           - "codedeploy:BatchGetDeploymentGroups"
+        #           - "codedeploy:BatchGetDeployments"
+        #           - "codedeploy:ContinueDeployment"
+        #           - "codedeploy:CreateApplication"
+        #           - "codedeploy:CreateDeployment"
+        #           - "codedeploy:CreateDeploymentGroup"
+        #           - "codedeploy:GetApplication"
+        #           - "codedeploy:GetApplicationRevision"
+        #           - "codedeploy:GetDeployment"
+        #           - "codedeploy:GetDeploymentConfig"
+        #           - "codedeploy:GetDeploymentGroup"
+        #           - "codedeploy:GetDeploymentTarget"
+        #           - "codedeploy:ListApplicationRevisions"
+        #           - "codedeploy:ListApplications"
+        #           - "codedeploy:ListDeploymentConfigs"
+        #           - "codedeploy:ListDeploymentGroups"
+        #           - "codedeploy:ListDeployments"
+        #           - "codedeploy:ListDeploymentTargets"
+        #           - "codedeploy:RegisterApplicationRevision"
+        #           - "codedeploy:StopDeployment"
+        #           - "ec2:AssociateRouteTable"
+        #           - "ec2:AttachInternetGateway"
+        #           - "ec2:AuthorizeSecurityGroupIngress"
+        #           - "ec2:CancelSpotFleetRequests"
+        #           - "ec2:CreateInternetGateway"
+        #           - "ec2:CreateLaunchTemplate"
+        #           - "ec2:CreateRoute"
+        #           - "ec2:CreateRouteTable"
+        #           - "ec2:CreateSecurityGroup"
+        #           - "ec2:CreateSubnet"
+        #           - "ec2:CreateVpc"
+        #           - "ec2:DeleteLaunchTemplate"
+        #           - "ec2:DeleteSubnet"
+        #           - "ec2:DeleteVpc"
+        #           - "ec2:Describe*"
+        #           - "ec2:DetachInternetGateway"
+        #           - "ec2:DisassociateRouteTable"
+        #           - "ec2:ModifySubnetAttribute"
+        #           - "ec2:ModifyVpcAttribute"
+        #           - "ec2:RequestSpotFleet"
+        #           - "ec2:RunInstances"
+        #           - "ecs:*"
+        #           - "elasticfilesystem:DescribeAccessPoints"
+        #           - "elasticfilesystem:DescribeFileSystems"
+        #           - "elasticloadbalancing:CreateListener"
+        #           - "elasticloadbalancing:CreateLoadBalancer"
+        #           - "elasticloadbalancing:CreateRule"
+        #           - "elasticloadbalancing:CreateTargetGroup"
+        #           - "elasticloadbalancing:DeleteListener"
+        #           - "elasticloadbalancing:DeleteLoadBalancer"
+        #           - "elasticloadbalancing:DeleteRule"
+        #           - "elasticloadbalancing:DeleteTargetGroup"
+        #           - "elasticloadbalancing:DescribeListeners"
+        #           - "elasticloadbalancing:DescribeLoadBalancers"
+        #           - "elasticloadbalancing:DescribeRules"
+        #           - "elasticloadbalancing:DescribeTargetGroups"
+        #           - "events:DeleteRule"
+        #           - "events:DescribeRule"
+        #           - "events:ListRuleNamesByTarget"
+        #           - "events:ListTargetsByRule"
+        #           - "events:PutRule"
+        #           - "events:PutTargets"
+        #           - "events:RemoveTargets"
+        #           - "fsx:DescribeFileSystems"
+        #           - "iam:ListAttachedRolePolicies"
+        #           - "iam:ListInstanceProfiles"
+        #           - "iam:ListRoles"
+        #           - "lambda:ListFunctions"
+        #           - "logs:CreateLogGroup"
+        #           - "logs:DescribeLogGroups"
+        #           - "logs:FilterLogEvents"
+        #           - "route53:CreateHostedZone"
+        #           - "route53:DeleteHostedZone"
+        #           - "route53:GetHealthCheck"
+        #           - "route53:GetHostedZone"
+        #           - "route53:ListHostedZonesByName"
+        #           - "servicediscovery:CreatePrivateDnsNamespace"
+        #           - "servicediscovery:CreateService"
+        #           - "servicediscovery:DeleteService"
+        #           - "servicediscovery:GetNamespace"
+        #           - "servicediscovery:GetOperation"
+        #           - "servicediscovery:GetService"
+        #           - "servicediscovery:ListNamespaces"
+        #           - "servicediscovery:ListServices"
+        #           - "servicediscovery:UpdateService"
+        #           - "sns:ListTopics"
+        #         Resource: "*"
+  # MyVPC:
+  #   Type: "AWS::EC2::VPC"
+  #   Properties:
+  #     CidrBlock: "10.0.0.0/16"
+  #     Tags:
+  #       - Key: "Name"
+  #         Value: "My VPC"
+  # MySubnet:
+  #   Type: "AWS::EC2::Subnet"
+  #   Properties:
+  #     VpcId: !Ref MyVPC
+  #     CidrBlock: "10.0.1.0/24"
+  #     Tags:
+  #       - Key: "Name"
+  #         Value: "My Subnet"
+  MySecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "My security group"
+      VpcId: vpc-07703dac9cc3b8c10
+      SecurityGroupIngress:
+        - IpProtocol: "udp"
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "Name"
+          Value: "My Security Group"
+  ECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: CFNCluster
+  MyLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: /ecs/fargate-task-definition
+      RetentionInDays: 7
+  taskdefinition:
+    Type: "AWS::ECS::TaskDefinition"
+    Properties:
+      ContainerDefinitions:
+        - Command:
+            - -n
+            - "--realm=otter-coturn-server"
+            - '--external-ip="$(detect-external-ip)"'
+            - "--listening-port=80"
+            - "--min-port=49152"
+            - "--max-port=49227"
+            - "--use-auth-secret"
+            - "--static-auth-secret=OTTER-WebRTC-2023"
+            - "--fingerprint"
+            - "--max-allocate-lifetime=5400"
+            - "--rest-api-separator='-:-'"
+            - "--verbose"
+            - "--no-tls"
+            - "--no-dtls"
+            - "--no-cli"
+          Essential: true
+          Name: otter-coturn-server
+          Image: coturn/coturn:latest
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /ecs/fargate-task-definition
+              awslogs-region: us-west-1
+              awslogs-stream-prefix: ecs
+          Name: sample-fargate-app
+          PortMappings:
+            - ContainerPort: 80
+              HostPort: 80
+              Protocol: tcp
+            - ContainerPort: 49152
+              HostPort: 49152
+              Protocol: udp
+            - ContainerPort: 49153
+              HostPort: 49153
+              Protocol: udp
+            - ContainerPort: 49154
+              HostPort: 49154
+              Protocol: udp
+            - ContainerPort: 49155
+              HostPort: 49155
+              Protocol: udp
+            - ContainerPort: 49156
+              HostPort: 49156
+              Protocol: udp
+            - ContainerPort: 49157
+              HostPort: 49157
+              Protocol: udp
+            - ContainerPort: 49158
+              HostPort: 49158
+              Protocol: udp
+            - ContainerPort: 49159
+              HostPort: 49159
+              Protocol: udp
+            - ContainerPort: 49160
+              HostPort: 49160
+              Protocol: udp
+            - ContainerPort: 49161
+              HostPort: 49161
+              Protocol: udp
+            - ContainerPort: 49162
+              HostPort: 49162
+              Protocol: udp
+            - ContainerPort: 49163
+              HostPort: 49163
+              Protocol: udp
+            - ContainerPort: 49164
+              HostPort: 49164
+              Protocol: udp
+            - ContainerPort: 49165
+              HostPort: 49165
+              Protocol: udp
+            - ContainerPort: 49166
+              HostPort: 49166
+              Protocol: udp
+            - ContainerPort: 49167
+              HostPort: 49167
+              Protocol: udp
+            - ContainerPort: 49168
+              HostPort: 49168
+              Protocol: udp
+            - ContainerPort: 49169
+              HostPort: 49169
+              Protocol: udp
+            - ContainerPort: 49170
+              HostPort: 49170
+              Protocol: udp
+            - ContainerPort: 49171
+              HostPort: 49171
+              Protocol: udp
+            - ContainerPort: 49172
+              HostPort: 49172
+              Protocol: udp
+            - ContainerPort: 49173
+              HostPort: 49173
+              Protocol: udp
+            - ContainerPort: 49174
+              HostPort: 49174
+              Protocol: udp
+            - ContainerPort: 49175
+              HostPort: 49175
+              Protocol: udp
+            - ContainerPort: 49176
+              HostPort: 49176
+              Protocol: udp
+            - ContainerPort: 49177
+              HostPort: 49177
+              Protocol: udp
+            - ContainerPort: 49178
+              HostPort: 49178
+              Protocol: udp
+            - ContainerPort: 49179
+              HostPort: 49179
+              Protocol: udp
+            - ContainerPort: 49180
+              HostPort: 49180
+              Protocol: udp
+      Cpu: "256"
+      ExecutionRoleArn: !Ref ecsTaskExecutionRole
+      Family: task-definition-cfn
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: X86_64,
+        OperatingSystemFamily: LINUX
+
+  ECSService:
+    Type: "AWS::ECS::Service"
+    Properties:
+      ServiceName: cfn-service
+      Cluster: !Ref ECSCluster
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref MySecurityGroup
+          Subnets:
+            - subnet-042f334483327df8f
+      TaskDefinition: !Ref taskdefinition
+      LoadBalancers:
+        - ContainerName: sample-fargate-app
+          ContainerPort: 80
+          TargetGroupArn: !Ref OtterCoturnTargetGroup
+    DependsOn: 
+      - OtterCoturnNLB 
+  
+  OtterCoturnTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      TargetType: ip
+      TargetGroupName: otter-coturn-target-group
+      Protocol: UDP
+      Port: 80
+      VpcId: vpc-07703dac9cc3b8c10
+        
+  OtterCoturnNLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: otter-coturn-nlb
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - subnet-042f334483327df8f
+      Type: network
+      LoadBalancerAttributes:
+        - Key: load_balancing.cross_zone.enabled
+          Value: "true"
+      Tags:
+        - Key: Name
+          Value: OtterCoturnNLB
+    DependsOn: OtterCoturnTargetGroup
+    
+  OtterCoturnListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref OtterCoturnTargetGroup
+      LoadBalancerArn: !Ref OtterCoturnNLB
+      Port: 80
+      Protocol: UDP
+    DependsOn: 
+      - OtterCoturnTargetGroup
+      - OtterCoturnNLB
