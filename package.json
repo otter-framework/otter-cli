@@ -1,23 +1,86 @@
 {
-  "name": "signal",
-  "version": "1.0.0",
-  "description": "",
-  "main": "cloudF.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "name": "otter-cli",
+  "version": "0.0.0",
+  "description": "Otter Framework CLI",
   "author": "",
-  "license": "ISC",
+  "bin": {
+    "otter": "./bin/run.js"
+  },
+  "type": "module",
+  "homepage": "https://github.com/otter-framework/otter-cli",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "repository": "otter-framework/otter-cli",
+  "files": [
+    "/bin",
+    "/dist",
+    "/npm-shrinkwrap.json",
+    "/oclif.manifest.json"
+  ],
   "dependencies": {
-    "@aws-sdk/client-apigatewayv2": "^3.282.0",
-    "@aws-sdk/client-cloudformation": "^3.282.0",
-    "@aws-sdk/client-ec2": "^3.282.0",
-    "@aws-sdk/client-iam": "^3.282.0",
-    "@aws-sdk/client-ssm": "^3.282.0",
-    "cfonts": "^3.1.1",
-    "clui": "^0.3.6",
-    "inquirer": "^8.0.0",
-    "node-emoji": "^1.11.0",
-    "readline": "^1.3.0"
-  }
+    "@aws-sdk/client-apigatewayv2": "^3.289.0",
+    "@aws-sdk/client-cloudformation": "^3.288.0",
+    "@aws-sdk/credential-providers": "^3.288.0",
+    "@oclif/core": "^2",
+    "@oclif/plugin-help": "^5",
+    "@oclif/plugin-plugins": "^2.3.2",
+    "chalk": "^5.2.0",
+    "conf": "^11.0.1",
+    "figlet": "^1.5.2",
+    "inquirer": "^9.1.4",
+    "ora": "^6.1.2"
+  },
+  "devDependencies": {
+    "@aws-sdk/types": "^3.289.0",
+    "@oclif/test": "^2.3.8",
+    "@types/chai": "^4",
+    "@types/figlet": "^1.5.5",
+    "@types/inquirer": "^9.0.3",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^16.18.14",
+    "chai": "^4",
+    "eslint": "^7.32.0",
+    "eslint-config-oclif": "^4",
+    "eslint-config-oclif-typescript": "^1.0.3",
+    "mocha": "^9",
+    "oclif": "^3",
+    "shx": "^0.3.3",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.5.0",
+    "typescript": "^4.9.5"
+  },
+  "oclif": {
+    "bin": "otter",
+    "dirname": "otter",
+    "commands": "./dist/commands",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-plugins"
+    ],
+    "topicSeparator": " ",
+    "topics": {
+      "deploy": {
+        "description": "deploy aws infrastructure"
+      }
+    }
+  },
+  "scripts": {
+    "build": "shx rm -rf dist && tsc -b",
+    "lint": "eslint . --ext .ts --config .eslintrc",
+    "postpack": "shx rm -f oclif.manifest.json",
+    "posttest": "yarn lint",
+    "prepack": "yarn build && oclif manifest && oclif readme",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "version": "oclif readme && git add README.md",
+    "deploy": "./bin/dev.js deploy",
+    "destroy": "./bin/dev.js destroy"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bugs": "https://github.com/otter-framework/otter-cli/issues",
+  "keywords": [
+    "oclif"
+  ],
+  "types": "dist/index.d.ts"
 }
