@@ -1,13 +1,34 @@
 import { Command } from "@oclif/core";
 import { GetAwsInfo } from "../prompts/getAwsInfo.js";
 import { AwsServices } from "../aws/awsServices.js";
-import { stackEnv } from "../aws/stackEnv.js";
+import {
+  StackDescription,
+  stacks,
+  apiStack,
+} from "../utils/stackDescriptions.js";
 import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
-import { errorHandler } from "../utils/errorHandler.js";
+import { deployErrorHandler } from "../utils/errorHandler.js";
 
 const aws = new AwsServices();
 
+const deployStack = async (stack: StackDescription) => {
+  let spinner = ui.spinner(stack.initiateMessage);
+  const stackId = await aws
+    .provisionResources(stack.name, stack.template)
+    .catch((err) => deployErrorHandler(err, spinner));
+  spinner.succeed(ui.secondary(stack.initiateCompleteMessage));
+
+  if (stackId) storeStackId(stackId);
+
+  spinner = ui.spinner(stack.deployingMessage);
+  await aws
+    .checkStackCreationStatus(stack.name)
+    .catch((err) => deployErrorHandler(err, spinner));
+  spinner.succeed(ui.secondary(stack.deployCompleteMessage));
+};
+
+// main `deploy` command login
 export class Deploy extends Command {
   static description = "deploy otter aws infrastructure";
 
@@ -20,44 +41,18 @@ export class Deploy extends Command {
 
     ui.display("\n🦦 Otter is being deployed and might take a few minutes\n");
 
-    // deploy signaling stack
-    let spinner = ui.spinner("Initiating Signaling Services deployment...");
-    const signalingStackId = await aws
-      .provisionResources(
-        stackEnv.SIGNAL_STACK_NAME,
-        stackEnv.SIGNAL_STACK_TEMPLATE
-      )
-      .catch((err) => errorHandler(err, spinner));
-    if (signalingStackId) storeStackId(signalingStackId);
-    spinner.succeed(ui.green("Signaling Services deployment initiated"));
-
-    spinner = ui.spinner("Deploying Otter Signaling Services...");
-    await aws
-      .checkStackCreationStatus(stackEnv.SIGNAL_STACK_NAME)
-      .catch((err) => errorHandler(err, spinner));
-    spinner.succeed(ui.green("Otter Signaling Services deployed"));
-
-    // deploy API stack
-    spinner = ui.spinner("Initiating API Services deployment...");
-    const apiStackId = await aws
-      .provisionResources(stackEnv.API_STACK_NAME, stackEnv.API_STACK_TEMPLATE)
-      .catch((err) => errorHandler(err, spinner));
-    if (apiStackId) storeStackId(apiStackId);
-    spinner.succeed(ui.green("API Services deployment initiated"));
-
-    spinner = ui.spinner("Deploying Otter API Services...");
-    await aws
-      .checkStackCreationStatus(stackEnv.API_STACK_NAME)
-      .catch((err) => errorHandler(err, spinner));
-    spinner.succeed(ui.green("Otter API Services deployed"));
+    // deploy stacks
+    for (let stack of stacks) {
+      await deployStack(stack);
+    }
 
     // retrieve API endpoint
-    spinner = ui.spinner("Gathering your resource information...");
+    let spinner = ui.spinner("Gathering your resource information...");
     const apiEndpoint = await aws
-      .getApiEndpoint(stackEnv.API_STACK_NAME)
-      .catch((err) => errorHandler(err, spinner));
+      .getApiEndpoint(apiStack.name)
+      .catch((err) => deployErrorHandler(err, spinner));
     config.set({ apiEndpoint });
-    spinner.succeed(ui.green("Resource information acquired"));
+    spinner.succeed(ui.secondary("Resource information acquired"));
 
     // summary and goodbye
     ui.printOtter();

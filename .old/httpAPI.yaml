@@ -195,14 +195,9 @@ Resources:
     Type: AWS::ApiGatewayV2::Api
     Properties:
       Name: MyHTTPAPIGateway
+      StageName: v1
       ProtocolType: HTTP
       RouteSelectionExpression: "${request.method} ${request.path}"
-
-  ApiGatewayRoute:
-    Type: AWS::ApiGatewayV2::Stage
-    Properties:
-      ApiId: !Ref ApiGateway
-      StageName: v1
 
   RoomsRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -520,6 +515,3 @@ Resources:
           - ":"
           - !Ref ApiGateway
           - /*/*
-Outputs:
-  APIGateWayEndpoint:
-    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/v1"
