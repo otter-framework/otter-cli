@@ -1,10 +1,12 @@
 # Otter Framework CLI
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/oclif-video-cli.svg)](https://npmjs.org/package/oclif-video-cli)
+[![Version](https://img.shields.io/npm/v/otter-video-cli.svg)](https://npmjs.org/package/otter-video-cli)
 
-### Todo
+# Todo
 
+- more options for deploy
+- more robust error handling
 - `otter status`: Health check all components and show the results
 - `otter config`: Display configuration file location (and maybe allow user to change them through cli)
 - `otter` and `otter --help`: Show introduction and help info
@@ -12,8 +14,6 @@
 
   - create a cloudformation changeset and deploy it, or
   - ask user to `destroy` first before running `deploy` again
-
-- test against all types or errors, separate warnings and errors
 
 <!-- toc -->
 
