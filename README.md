@@ -16,11 +16,11 @@ oclif example Hello World CLI
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g otter-cli
+$ npm install -g otter-video-cli
 $ otter COMMAND
 running command...
 $ otter (--version)
-otter-cli/0.0.0 darwin-x64 node-v19.5.0
+otter-video-cli/0.0.2 darwin-x64 node-v19.5.0
 $ otter --help [COMMAND]
 USAGE
   $ otter COMMAND
@@ -29,8 +29,8 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
-* [`otter hello PERSON`](#otter-hello-person)
-* [`otter hello world`](#otter-hello-world)
+* [`otter deploy`](#otter-deploy)
+* [`otter destroy`](#otter-destroy)
 * [`otter help [COMMANDS]`](#otter-help-commands)
 * [`otter plugins`](#otter-plugins)
 * [`otter plugins:install PLUGIN...`](#otter-pluginsinstall-plugin)
@@ -42,45 +42,33 @@ USAGE
 * [`otter plugins:uninstall PLUGIN...`](#otter-pluginsuninstall-plugin-2)
 * [`otter plugins update`](#otter-plugins-update)
 
-## `otter hello PERSON`
+## `otter deploy`
 
-Say hello
-
-```
-USAGE
-  $ otter hello PERSON -f <value>
-
-ARGUMENTS
-  PERSON  Person to say hello to
-
-FLAGS
-  -f, --from=<value>  (required) Who is saying hello
-
-DESCRIPTION
-  Say hello
-
-EXAMPLES
-  $ oex hello friend --from oclif
-  hello friend from oclif! (./src/commands/hello/index.ts)
-```
-
-_See code: [dist/commands/hello/index.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.0/dist/commands/hello/index.ts)_
-
-## `otter hello world`
-
-Say hello world
+deploy otter aws infrastructure
 
 ```
 USAGE
-  $ otter hello world
+  $ otter deploy
 
 DESCRIPTION
-  Say hello world
-
-EXAMPLES
-  $ otter hello world
-  hello world! (./src/commands/hello/world.ts)
+  deploy otter aws infrastructure
 ```
+
+_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.2/dist/commands/deploy.ts)_
+
+## `otter destroy`
+
+destroy otter aws infrastructure
+
+```
+USAGE
+  $ otter destroy
+
+DESCRIPTION
+  destroy otter aws infrastructure
+```
+
+_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.2/dist/commands/destroy.ts)_
 
 ## `otter help [COMMANDS]`
 
@@ -100,7 +88,7 @@ DESCRIPTION
   Display help for otter.
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v5.2.6/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v5.2.7/src/commands/help.ts)_
 
 ## `otter plugins`
 
@@ -120,7 +108,7 @@ EXAMPLES
   $ otter plugins
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.3.2/src/commands/plugins/index.ts)_
+_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v2.4.0/src/commands/plugins/index.ts)_
 
 ## `otter plugins:install PLUGIN...`
 

@@ -1,10 +1,10 @@
 import { Command } from "@oclif/core";
-import { GetAwsInfo } from "../../prompts/getAwsInfo.js";
-import { AwsServices } from "../../aws/awsServices.js";
-import { stackEnv } from "../../aws/stackEnv.js";
-import { config } from "../../utils/config.js";
-import * as ui from "../../utils/ui.js";
-import { errorHandler } from "../../utils/errorHandler.js";
+import { GetAwsInfo } from "../prompts/getAwsInfo.js";
+import { AwsServices } from "../aws/awsServices.js";
+import { stackEnv } from "../aws/stackEnv.js";
+import { config } from "../utils/config.js";
+import * as ui from "../utils/ui.js";
+import { errorHandler } from "../utils/errorHandler.js";
 
 const aws = new AwsServices();
 
