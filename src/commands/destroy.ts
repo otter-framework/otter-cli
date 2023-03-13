@@ -29,7 +29,7 @@ export class Deploy extends Command {
 
     // start teardown process
     ui.display(
-      "\nOtter infrastructure is being removed and might take a few minutes 🤖\n"
+      "\n🚜 Otter infrastructure is being removed and might take a few minutes\n"
     );
 
     let spinner = ui.emptySpinner();

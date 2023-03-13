@@ -21,9 +21,11 @@ interface InterfaceAwsServices {
 
 export class AwsServices implements InterfaceAwsServices {
   cloudFormationClient: CloudFormation | null;
+  checkInterval: number;
 
   constructor() {
     this.cloudFormationClient = null;
+    this.checkInterval = 3000;
   }
 
   async provisionResources(
@@ -73,10 +75,11 @@ export class AwsServices implements InterfaceAwsServices {
             clearInterval(id);
             reject(`Stack creation failed with status ${stackStatus}`);
         }
-      }, 3000);
+      }, this.checkInterval);
     });
   }
 
+  // check deletion result by looking for target stack from all deleted stacks
   async checkStackDeletionStatus(stackToBeDeleted: string): Promise<void> {
     return await new Promise((resolve, reject) => {
       const id = setInterval(async () => {
@@ -97,10 +100,11 @@ export class AwsServices implements InterfaceAwsServices {
           clearInterval(id);
           resolve();
         }
-      }, 3000);
+      }, this.checkInterval);
     });
   }
 
+  // get API endpoint from stack output
   async getApiEndpoint(apiStackName: string): Promise<string> {
     const stackDescription = await this.cloudFormationClient
       ?.describeStacks({
@@ -120,6 +124,7 @@ export class AwsServices implements InterfaceAwsServices {
     this.cloudFormationClient = new CloudFormation({ credentials, region });
   }
 
+  // private methods below
   private async getStackStatus(stackName: string) {
     const stackData: DescribeStacksCommandOutput | undefined =
       await this.cloudFormationClient

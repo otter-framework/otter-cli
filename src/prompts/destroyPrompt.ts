@@ -6,7 +6,7 @@ const areYouSureQuestion: DistinctQuestion = {
   name: "confirmDestroy",
   message:
     "Are you sure you want to " +
-    ui.warning("destroy ") +
+    ui.error("destroy ") +
     "all Otter infrastructures?",
   default: false,
 };

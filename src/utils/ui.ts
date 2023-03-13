@@ -1,12 +1,14 @@
 import ora from "ora";
 import chalk from "chalk";
 import figlet from "figlet";
+import gradient from "gradient-string";
 
 export const warning = chalk.yellow;
 export const error = chalk.red;
-export const highlight = chalk.cyan.bold;
+export const highlight = chalk.bold.hex("#39C5FB");
 export const cyan = chalk.cyan;
 export const green = chalk.green;
+export const otterGradient = gradient(["#B175FF", "#6077FF", "#39C5FB"]);
 
 export let logo: string | undefined;
 
@@ -34,7 +36,7 @@ export const clear = () => {
   console.clear();
 };
 
-export const generateLogo = () => {
+export const generateLogo = (): void => {
   figlet.text(
     "Otter",
     {
@@ -52,13 +54,12 @@ export const generateLogo = () => {
   );
 };
 
-export const hello = () => {
+export const hello = (): void => {
   clear();
-
-  console.log(cyan("Welcome to Otter!\n"));
+  console.log(otterGradient("\nOtter Framework CLI\n"));
 };
 
-export const printOtter = () => {
+export const printOtter = (): void => {
   console.log("\n");
   console.log(`
       .-"""-.                      
