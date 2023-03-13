@@ -195,6 +195,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Api
     Properties:
       Name: MyHTTPAPIGateway
+      StageName: v1
       ProtocolType: HTTP
       RouteSelectionExpression: "${request.method} ${request.path}"
 

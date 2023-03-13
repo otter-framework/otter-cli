@@ -20,6 +20,11 @@ const schema = {
     type: "array",
     default: [],
   },
+
+  apiEndpoint: {
+    type: "string",
+    default: "",
+  },
 };
 
 export const config = new Conf({
@@ -27,3 +32,9 @@ export const config = new Conf({
   schema,
   projectSuffix: "framework",
 });
+
+export const storeStackId = (stackId: string): void => {
+  const createdStacks = config.get("createdStacks") as string[];
+  createdStacks.push(stackId);
+  config.set({ createdStacks });
+};
