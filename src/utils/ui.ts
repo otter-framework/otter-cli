@@ -4,10 +4,11 @@ import figlet from "figlet";
 import gradient from "gradient-string";
 
 export const warning = chalk.yellow;
-export const error = chalk.red;
+export const red = chalk.red;
 export const highlight = chalk.bold.hex("#39C5FB");
 export const cyan = chalk.cyan;
 export const green = chalk.green;
+export const secondary = chalk.gray;
 export const otterGradient = gradient(["#B175FF", "#6077FF", "#39C5FB"]);
 
 export let logo: string | undefined;
@@ -26,6 +27,10 @@ export const display = (text: string) => {
 
 export const warn = (text: string) => {
   console.log(warning(text));
+};
+
+export const error = (text: string) => {
+  console.log(red(text));
 };
 
 export const success = (text: string) => {

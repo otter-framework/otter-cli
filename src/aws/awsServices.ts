@@ -145,7 +145,12 @@ export class AwsServices implements InterfaceAwsServices {
   }
 
   private isError(status: string | void | undefined): boolean {
-    if (status) return status.endsWith("FAILED");
+    if (status)
+      return (
+        status.endsWith("FAILED") ||
+        status === "ROLLBACK_COMPLETE" ||
+        status === "ROLLBACK_IN_PROGRESS"
+      );
 
     return false;
   }

@@ -51,12 +51,12 @@ export class Deploy extends Command {
         .checkStackDeletionStatus(currentStack)
         .catch((err) => errorHandler(err, spinner));
     }
-    spinner.succeed(ui.green("Otter infrastructure teardown complete"));
+    spinner.succeed(ui.secondary("Otter infrastructure teardown complete"));
 
     // remove stack info from config
     spinner = ui.spinner("Final cleanup");
     config.set({ createdStacks: [] });
-    spinner.succeed(ui.green("Final cleanup"));
+    spinner.succeed(ui.secondary("Final cleanup"));
 
     ui.success("\nTeardown completed successfully. Bye! 👋");
   }
