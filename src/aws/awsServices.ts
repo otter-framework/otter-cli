@@ -3,9 +3,10 @@ import {
   CloudFormationServiceException,
   DescribeStacksCommandOutput,
 } from "@aws-sdk/client-cloudformation";
-import { ApiGatewayV2 } from "@aws-sdk/client-apigatewayv2";
 import { AwsCredentialIdentity } from "@aws-sdk/types";
 import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "url";
 
 interface InterfaceAwsServices {
   provisionResources: (
@@ -19,15 +20,6 @@ interface InterfaceAwsServices {
 }
 
 export class AwsServices implements InterfaceAwsServices {
-  static Env = {
-    SIGNAL_STACK_NAME: "NewTestSignalStack",
-    SIGNAL_STACK_TEMPLATE: "./src/aws/signaling.yaml",
-    API_STACK_NAME: "NewAPITestStack",
-    API_STACK_TEMPLATE: "./src/aws/httpAPI.yaml",
-    TURN_SERVER_STACK_NAME: "",
-    TURN_SERVER_TEMPLATE: "",
-  };
-
   cloudFormationClient: CloudFormation | null;
 
   constructor() {
@@ -38,9 +30,11 @@ export class AwsServices implements InterfaceAwsServices {
     stackName: string,
     template: string
   ): Promise<string | undefined> {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
     const params = {
       StackName: stackName,
-      TemplateBody: fs.readFileSync(template, "utf8"),
+      TemplateBody: fs.readFileSync(path.join(__dirname, template), "utf8"),
       Capabilities: ["CAPABILITY_IAM"],
     };
 

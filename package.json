@@ -1,8 +1,8 @@
 {
-  "name": "otter-cli",
-  "version": "0.0.0",
-  "description": "Otter Framework CLI",
-  "author": "",
+  "name": "otter-video-cli",
+  "version": "0.0.2",
+  "description": "Deploy and Manage Otter Infrastructures",
+  "author": "otter-framework",
   "bin": {
     "otter": "./bin/run.js"
   },
@@ -59,24 +59,23 @@
     ],
     "topicSeparator": " ",
     "topics": {
-      "deploy": {
-        "description": "deploy aws infrastructure"
+      "hello": {
+        "description": "Say hello to the world and others"
       }
     }
   },
   "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
+    "build": "shx rm -rf dist && tsc -b && npm run copy-files",
+    "copy-files": "cp -r ./src/aws/templates ./dist/aws",
     "lint": "eslint . --ext .ts --config .eslintrc",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "yarn lint",
     "prepack": "yarn build && oclif manifest && oclif readme",
     "test": "mocha --forbid-only \"test/**/*.test.ts\"",
-    "version": "oclif readme && git add README.md",
-    "deploy": "./bin/dev.js deploy",
-    "destroy": "./bin/dev.js destroy"
+    "version": "oclif readme && git add README.md"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=12.0.0"
   },
   "bugs": "https://github.com/otter-framework/otter-cli/issues",
   "keywords": [
