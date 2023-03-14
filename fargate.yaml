@@ -458,6 +458,7 @@ Resources:
           TargetGroupArn: !Ref OtterCoturnTargetGroup
     DependsOn: 
       - OtterCoturnNLB
+      - OtterCoturnListener
   
   OtterCoturnTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
