@@ -36,6 +36,8 @@ Resources:
           - Effect: Allow
             Action:
               - "dynamodb:UpdateItem"
+              - "dynamodb:GetItem"
+              - "dynamodb:ListStreams"
             Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${RoomCountsTable2301}"
       Roles:
         - !Ref CrossTableLambdaExecutionRole
@@ -45,12 +47,16 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-          import { unmarshall } from '@aws-sdk/util-dynamodb';
-          import { DynamoDBDocumentClient, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { unmarshall } = require("@aws-sdk/util-dynamodb");
+          const {
+            DynamoDBDocumentClient,
+            UpdateCommand,
+            GetCommand,
+          } = require("@aws-sdk/lib-dynamodb");
 
-          const TABLE_NAME = 'rooms';
-          const REGION = process.env.AWS_REGION || 'us-east-2';
+          const TABLE_NAME = "RoomCountsTable2301";
+          const REGION = process.env.AWS_REGION || "us-east-2";
           const marshallOptions = {
             removeUndefinedValues: true, // false, by default.
           };
@@ -60,25 +66,59 @@ Resources:
             marshallOptions,
           });
 
-          const updateRoomStatusById = async (id, status) => {
+          const getNewStatusOnConnect = (prevStatus) => {
+            let newStatus;
+            switch (prevStatus) {
+              case "open":
+                newStatus = "occupied";
+                break;
+              case "occupied":
+                newStatus = "full";
+                break;
+              default:
+                throw new Error(`Cannot change the status from ${prevStatus}`);
+            }
+
+            return newStatus;
+          };
+
+          const getNewStatusOnDisconnect = (prevStatus) => {
+            let newStatus;
+            switch (prevStatus) {
+              case "full":
+                newStatus = "occupied";
+                break;
+              case "occupied":
+                newStatus = "closed";
+                break;
+              default:
+                throw new Error(`Cannot change the status from ${prevStatus}`);
+            }
+
+            return newStatus;
+          };
+
+          const updateRoomStatusById = async (roomId, status) => {
             const params = {
               TableName: TABLE_NAME,
-              Key: { id },
-              UpdateExpression: 'set #current_status = :s',
-              ExpressionAttributeNames: { '#current_status': 'status' },
-              ExpressionAttributeValues: { ':s': status },
+              Key: { roomId },
+              UpdateExpression: "set #current_status = :s",
+              ExpressionAttributeNames: { "#current_status": "status" },
+              ExpressionAttributeValues: { ":s": status },
             };
 
             await dynamo.send(new UpdateCommand(params));
           };
 
-          const getRoomStatusById = async (id) => {
+          const getRoomStatusById = async (roomId) => {
             const params = {
               TableName: TABLE_NAME,
-              Key: { id },
+              Key: { roomId },
             };
+            console.log("inside getRoomStatusById, params:", params);
 
             const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            console.log("Item: ", dataFromDatabase.Item);
             const roomResource = dataFromDatabase.Item ? dataFromDatabase.Item : null;
 
             if (roomResource && roomResource.status) return roomResource.status;
@@ -86,63 +126,41 @@ Resources:
             return null;
           };
 
-          export const getNewStatusOnConnect = (prevStatus) => {
-            let newStatus;
-            switch (prevStatus) {
-              case 'open':
-                newStatus = 'occupied';
-                break;
-              case 'occupied':
-                newStatus = 'full';
-                break;
-              default:
-                throw new Error(`Cannot change the status from ${prevStatus}`);
+          const extractRecordData = (record) => {
+            let dynamoDbRecord;
+            if (record.eventName === "INSERT" || record.eventName === "MODIFY") {
+              dynamoDbRecord = record.dynamodb.NewImage;
+            } else {
+              dynamoDbRecord = record.dynamodb.OldImage;
             }
 
-            return newStatus;
+            return unmarshall(dynamoDbRecord);
           };
 
-          export const getNewStatusOnDisconnect = (prevStatus) => {
-            let newStatus;
-            switch (prevStatus) {
-              case 'full':
-                newStatus = 'occupied';
-                break;
-              case 'occupied':
-                newStatus = 'closed';
-                break;
-              default:
-                throw new Error(`Cannot change the status from ${prevStatus}`);
-            }
-
-            return newStatus;
-          };
-
-          export const lambdaHandler = async (event) => {
-            let roomId;
+          exports.handler = async (event) => {
             const record = event.Records[0];
 
-            console.log('event: ', event);
-            console.log('records:', event.Records);
-            console.log('record length:', event.Records.length);
-            console.log('Event name:', record.eventName);
-            console.log('new image: ', record.dynamodb.NewImage);
-            console.log('old image: ', record.dynamodb.OldImage);
-            const dynamoDbRecord = record.dynamodb.NewImage;
-            const recordData = unmarshall(dynamoDbRecord);
+            console.log("event: ", event);
+            console.log("records:", event.Records);
+            console.log("record length:", event.Records.length);
+            console.log("Event name:", record.eventName);
+            console.log("new image: ", record.dynamodb.NewImage);
+            console.log("old image: ", record.dynamodb.OldImage);
 
+            const recordData = extractRecordData(record);
+            const { roomId } = recordData;
             // Guard clauses before talking with db
-            if (record.eventName === 'INSERT') return;
-            if (!recordData.peerId) {
-              console.log('Database change does not have a room ID attach to it. Abort.');
+            if (record.eventName === "INSERT") return;
+            if (!roomId) {
+              console.log("Database change does not have a room ID attach to it. Abort.");
               return;
             }
 
-            roomId = recordData.peerId;
-            console.log('ROOM ID CAPTURED: ', roomId);
+            console.log("ROOM ID CAPTURED: ", roomId);
 
             try {
               const prevStatus = await getRoomStatusById(roomId);
+              console.log("prevStatus: ", prevStatus);
               if (!prevStatus) {
                 console.log(`The status of the room ${roomId} is missing. Abort.`);
                 return;
@@ -151,11 +169,11 @@ Resources:
               let newStatus;
 
               switch (record.eventName) {
-                case 'MODIFY':
+                case "MODIFY":
                   // a peer connected with a specific room
                   newStatus = getNewStatusOnConnect(prevStatus);
                   break;
-                case 'REMOVE':
+                case "REMOVE":
                   // a peer disconnect from a specific room
                   newStatus = getNewStatusOnDisconnect(prevStatus);
                   break;
@@ -163,12 +181,11 @@ Resources:
                   return;
               }
               await updateRoomStatusById(roomId, newStatus);
-              console.log('Room status updated!');
+              console.log("Room status updated!");
             } catch (err) {
-              console.log('Error while updating the database:', err);
+              console.log("Error while updating the database:", err);
             }
           };
-
       Role: !GetAtt
         - CrossTableLambdaExecutionRole
         - Arn
@@ -197,6 +214,25 @@ Resources:
       Name: MyHTTPAPIGateway
       ProtocolType: HTTP
       RouteSelectionExpression: "${request.method} ${request.path}"
+
+  ApiGatewayCors:
+    Type: AWS::ApiGatewayV2::Cors
+    Properties:
+      ApiId: !Ref ApiGateway
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "HEAD"
+          - "OPTIONS"
+          - "PATCH"
+        AllowHeaders:
+          - "*"
+        MaxAge: 86400
 
   RoomsRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -270,44 +306,107 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          const AWS = require('aws-sdk');
-          const ddb = new AWS.DynamoDB.DocumentClient();
-          const table = "RoomCountsTable2301";
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
+          const { GetCommand, ScanCommand } = require("@aws-sdk/lib-dynamodb");
 
-          exports.handler = async (event, context) => {
+          const createErrorResponse = (message) => {
+            return { message };
+          };
+
+          const TABLE_NAME = "RoomCountsTable2301";
+          const REGION = process.env.AWS_REGION || "us-east-2";
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const getRoomById = async (roomId) => {
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { roomId },
+            };
+
+            const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            return dataFromDatabase.Item ? dataFromDatabase.Item : null;
+          };
+
+          const getRoomByName = async (name) => {
+            console.log(name);
+            const params = {
+              TableName: TABLE_NAME,
+              FilterExpression: "#unique = :name",
+              ExpressionAttributeValues: {
+                ":name": name,
+              },
+              ExpressionAttributeNames: { "#unique": "unique_name" },
+            };
+
+            const dataFromDatabase = await dynamo.send(new ScanCommand(params));
+            const item = dataFromDatabase.Items ? dataFromDatabase.Items[0] : null;
+
+            return item;
+          };
+
+          const getRoomResource = async (uniqueIdentifier) => {
+            let roomResource = null;
+            if (uniqueIdentifier) {
+              if (uniqueIdentifier.startsWith("rm_")) {
+                roomResource = await getRoomById(uniqueIdentifier);
+              } else {
+                roomResource = await getRoomByName(uniqueIdentifier);
+              }
+            }
+
+            return roomResource;
+          };
+
+          exports.handler = async (event) => {
             try {
-              const roomId = event.pathParameters.id;
-
-              const getItemParams = {
-                TableName: table,
-                Key: {
-                  roomId: roomId,
+              console.log("pathParameters: ", event.pathParameters);
+              console.log("event: ", event);
+              if (event.pathParameters && event.pathParameters.id) {
+                const { id } = event.pathParameters;
+                const roomResource = await getRoomResource(id);
+                if (roomResource) {
+                  return {
+                    statusCode: 200,
+                    body: JSON.stringify(roomResource),
+                  };
+                } else {
+                  return {
+                    statusCode: 404,
+                    body: JSON.stringify(
+                      createErrorResponse(`Room ${id} does not exist.`)
+                    ),
+                  };
                 }
-              };
-
-              const existingItem = await ddb.get(getItemParams).promise();
-
-              if (existingItem.Item) {
-                // If item already exists, return info about the item
-                return {
-                  statusCode: 200,
-                  body: JSON.stringify({ message: 'Room info:', item: existingItem.Item })
-                };
               } else {
                 return {
                   statusCode: 400,
-                  body: JSON.stringify({ message: 'Room does not exist' })
+                  body: JSON.stringify(
+                    createErrorResponse(
+                      "No room ID or room name specified. Please check your request and try again"
+                    )
+                  ),
                 };
               }
-            } catch (error) {
-              console.error('Error adding or retrieving item from DynamoDB table: ', error);
+            } catch (err) {
+              console.log(err);
               return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Could not add or retrieve item from DynamoDB table' })
+                body: JSON.stringify(
+                  createErrorResponse(
+                    "Error when creating the new room. Please try again."
+                  )
+                ),
               };
             }
           };
-
       Role: !GetAtt
         - LambdaExecutionRole
         - Arn
@@ -401,44 +500,134 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          const AWS = require('aws-sdk');
-          const ddb = new AWS.DynamoDB.DocumentClient();
-          const table = "RoomCountsTable2301";
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
+          const {
+            PutCommand,
+            GetCommand,
+            ScanCommand,
+          } = require("@aws-sdk/lib-dynamodb");
+          const crypto = require("crypto");
 
-          exports.handler = async (event, context) => {
-          try {
-            const roomId = AWS.util.uuid.v4()
-            console.log(roomId, "ROOM ID HERE");
-            const now = new Date();
-            const utc = now.toUTCString();
-            const config = event.body ? JSON.parse(event.body) : {};
-
-            const itemParams = {
-              TableName: table,
-              Item: {
-                roomId: roomId, 
-                unique_name: config.uniqueName || '',
-                created_at: utc,
-                updated_at: utc,
-                status: "open",
-              }
-            };
-            
-            await ddb.put(itemParams).promise();
-
-            return {
-              statusCode: 200,
-              body: JSON.stringify({ message: 'Item added to DynamoDB table', id: roomId })
-            };
-            } catch (error) {
-            console.error('Error adding item to DynamoDB table: ', error);
-            return {
-              statusCode: 500,
-              body: JSON.stringify({ error: error })
-            };
-            }
+          const createErrorResponse = (message) => {
+            return { message };
           };
 
+          const generateRoomId = () => {
+            const id = "rm_" + crypto.randomUUID();
+            return id;
+          };
+
+          const TABLE_NAME = "RoomCountsTable2301";
+          const REGION = process.env.AWS_REGION || "us-east-2";
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const createRoom = async (config) => {
+            const roomId = generateRoomId(); // create room id with length of 10
+            const now = new Date();
+            const utc = now.toUTCString();
+            const roomResource = {
+              roomId,
+              unique_name: config.uniqueName || "",
+              created_at: utc,
+              updated_at: utc,
+              status: "open",
+            };
+            const params = {
+              TableName: TABLE_NAME,
+              Item: roomResource,
+            };
+            await dynamo.send(new PutCommand(params));
+            return roomResource;
+          };
+
+          const getRoomById = async (roomId) => {
+            console.log("inside getRoomById: ", roomId);
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { roomId },
+            };
+
+            const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            console.log("dataFromDatabase: ", dataFromDatabase);
+            return dataFromDatabase.Item ? dataFromDatabase.Item : null;
+          };
+
+          const getRoomByName = async (name) => {
+            console.log(name);
+            const params = {
+              TableName: TABLE_NAME,
+              FilterExpression: "#unique = :name",
+              ExpressionAttributeValues: {
+                ":name": name,
+              },
+              ExpressionAttributeNames: { "#unique": "unique_name" },
+            };
+
+            const dataFromDatabase = await dynamo.send(new ScanCommand(params));
+            const item = dataFromDatabase.Items ? dataFromDatabase.Items[0] : null;
+
+            return item;
+          };
+
+          const getRoomResource = async (uniqueIdentifier) => {
+            let roomResource = null;
+            if (uniqueIdentifier) {
+              if (uniqueIdentifier.startsWith("rm_")) {
+                console.log("room starts with 'rm'");
+                roomResource = await getRoomById(uniqueIdentifier);
+              } else {
+                console.log("room name route");
+                roomResource = await getRoomByName(uniqueIdentifier);
+              }
+            }
+
+            return roomResource;
+          };
+
+          exports.handler = async (event) => {
+            let roomResource;
+            try {
+              const config = event.body ? JSON.parse(event.body) : {};
+              const uniqueIdentifier = config.uniqueName;
+              // check whether the roomId/name exists or not
+              roomResource = await getRoomResource(uniqueIdentifier);
+              console.log("roomResource: ", roomResource);
+              // create the room if it doesn't exist
+              if (!roomResource || roomResource.roomId === undefined) {
+                console.log("roomResource: line 100: ", roomResource);
+                console.log("roomResource.id:", roomResource.roomId);
+                roomResource = await createRoom(config);
+              }
+
+              return {
+                statusCode: 200,
+                headers: {
+                  "Access-Control-Allow-Headers": "Content-Type",
+                  "Access-Control-Allow-Origin": "*",
+                  "Access-Control-Allow-Methods": "OPTIONS,POST",
+                },
+                body: JSON.stringify(roomResource),
+              };
+            } catch (err) {
+              console.log(err);
+              return {
+                statusCode: 500,
+                body: JSON.stringify(
+                  createErrorResponse(
+                    "Error when getting or creating the new room. Please try again."
+                  )
+                ),
+              };
+            }
+          };
       Role: !GetAtt
         - LambdaExecutionRole
         - Arn
