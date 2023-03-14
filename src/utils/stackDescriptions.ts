@@ -34,4 +34,4 @@ export const turnStack: StackDescription = {
   deployCompleteMessage: "Otter STUN/TURN cluster deployed",
 };
 
-export const stacks: StackDescription[] = [signalStack, apiStack, turnStack];
+export const stacks: StackDescription[] = [turnStack];
