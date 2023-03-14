@@ -5,6 +5,7 @@ import {
   StackDescription,
   stacks,
   apiStack,
+  signalStack,
 } from "../utils/stackDescriptions.js";
 import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
@@ -28,7 +29,7 @@ const deployStack = async (stack: StackDescription) => {
   spinner.succeed(ui.secondary(stack.deployCompleteMessage));
 };
 
-// main `deploy` command login
+// main `deploy` command logic
 export class Deploy extends Command {
   static description = "deploy otter aws infrastructure";
 
@@ -52,6 +53,10 @@ export class Deploy extends Command {
       .getApiEndpoint(apiStack.name)
       .catch((err) => deployErrorHandler(err, spinner));
     config.set({ apiEndpoint });
+    const webSocketEndpoint = await aws
+      .getApiEndpoint(signalStack.name)
+      .catch((err) => deployErrorHandler(err, spinner));
+    config.set({ webSocketEndpoint });
     spinner.succeed(ui.secondary("Resource information acquired"));
 
     // summary and goodbye
@@ -59,6 +64,7 @@ export class Deploy extends Command {
     ui.display(`\n${ui.otterGradient(ui.logo)}\n`);
     ui.success("\n🎉 Deployment completed successfully 🎉\n");
     ui.display(`- You API endpoint: ${ui.highlight(apiEndpoint)}`);
+    ui.display(`- You WebSocket endpoint: ${ui.highlight(webSocketEndpoint)}`);
     ui.display(`- Your Otter configuration file: ${ui.highlight(config.path)}`);
 
     ui.display("\nThank you for using Otter, see you next time! 👋");

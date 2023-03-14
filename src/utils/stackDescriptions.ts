@@ -7,7 +7,7 @@ export type StackDescription = {
   deployCompleteMessage: string;
 };
 
-const signalStack: StackDescription = {
+export const signalStack: StackDescription = {
   name: "NewTestSignalStack",
   template: "/templates/signaling.yaml",
   initiateMessage: "Initiating Signaling Services deployment...",
@@ -17,7 +17,7 @@ const signalStack: StackDescription = {
 };
 
 export const apiStack: StackDescription = {
-  name: "NewAPITestStack",
+  name: "APIStack",
   template: "/templates/httpAPI.yaml",
   initiateMessage: "Initiating API Services deployment...",
   initiateCompleteMessage: "API Services deployment initiated",
@@ -25,13 +25,13 @@ export const apiStack: StackDescription = {
   deployCompleteMessage: "Otter API Services deployed",
 };
 
-const turnStack: StackDescription = {
-  name: "",
-  template: "",
+export const turnStack: StackDescription = {
+  name: "TurnStack",
+  template: "/templates/fargate.yaml",
   initiateMessage: "Initiating STUN/TURN cluster deployment...",
   initiateCompleteMessage: "STUN/TURN cluster deployment initiated",
   deployingMessage: "Deploying Otter STUN/TURN cluster...",
   deployCompleteMessage: "Otter STUN/TURN cluster deployed",
 };
 
-export const stacks: StackDescription[] = [signalStack, apiStack];
+export const stacks: StackDescription[] = [signalStack, apiStack, turnStack];

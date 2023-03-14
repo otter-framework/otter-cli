@@ -3,6 +3,13 @@
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/otter-video-cli.svg)](https://npmjs.org/package/otter-video-cli)
 
+<!-- toc -->
+* [Otter Framework CLI](#otter-framework-cli)
+* [Todo](#todo)
+* [Usage](#usage)
+* [Commands](#commands)
+<!-- tocstop -->
+
 # Todo
 
 - more options for deploy
@@ -15,37 +22,28 @@
   - create a cloudformation changeset and deploy it, or
   - ask user to `destroy` first before running `deploy` again
 
-<!-- toc -->
-
-- [Usage](#usage)
-- [Commands](#commands)
-<!-- tocstop -->
-
 # Usage
 
 <!-- usage -->
-
 ```sh-session
 $ npm install -g otter-video-cli
 $ otter COMMAND
 running command...
 $ otter (--version)
-otter-video-cli/0.0.2 darwin-x64 node-v19.5.0
+otter-video-cli/0.0.4 darwin-x64 node-v19.5.0
 $ otter --help [COMMAND]
 USAGE
   $ otter COMMAND
 ...
 ```
-
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
-
-- [`otter deploy`](#otter-deploy)
-- [`otter destroy`](#otter-destroy)
-- [`otter help [COMMANDS]`](#otter-help-commands)
+* [`otter deploy`](#otter-deploy)
+* [`otter destroy`](#otter-destroy)
+* [`otter help [COMMANDS]`](#otter-help-commands)
 
 ## `otter deploy`
 
@@ -59,7 +57,7 @@ DESCRIPTION
   deploy otter aws infrastructure
 ```
 
-_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.2/dist/commands/deploy.ts)_
+_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.4/dist/commands/deploy.ts)_
 
 ## `otter destroy`
 
@@ -73,7 +71,7 @@ DESCRIPTION
   destroy otter aws infrastructure
 ```
 
-_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.2/dist/commands/destroy.ts)_
+_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.0.4/dist/commands/destroy.ts)_
 
 ## `otter help [COMMANDS]`
 
@@ -94,5 +92,4 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v5.2.8/src/commands/help.ts)_
-
 <!-- commandsstop -->

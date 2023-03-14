@@ -1,4 +1,4 @@
-import Conf, { Schema } from "conf";
+import Conf from "conf";
 
 const schema = {
   region: {
@@ -22,6 +22,11 @@ const schema = {
   },
 
   apiEndpoint: {
+    type: "string",
+    default: "",
+  },
+
+  webSocketEndpoint: {
     type: "string",
     default: "",
   },
