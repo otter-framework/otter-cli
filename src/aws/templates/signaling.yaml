@@ -1,0 +1,755 @@
+Resources:
+  ConnectionsTable2301:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: ConnectionsTable2301
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+
+  ConnectHandlerServiceRole2301:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join
+          - ""
+          - - "arn:"
+            - !Ref "AWS::Partition"
+            - ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  ConnectHandlerServiceRoleDefaultPolicy2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "dynamodb:BatchWriteItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+            Effect: Allow
+            Resource:
+              - !GetAtt
+                - ConnectionsTable2301
+                - Arn
+              - !Ref "AWS::NoValue"
+        Version: 2012-10-17
+      PolicyName: ConnectHandlerServiceRoleDefaultPolicy2301
+      Roles:
+        - !Ref ConnectHandlerServiceRole2301
+  ConnectHandler2301:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require('aws-sdk');
+                const ddb = new AWS.DynamoDB.DocumentClient();
+                exports.handler = async function (event, context) {
+                  try {
+                    await ddb
+                      .put({
+                        TableName: process.env.table,
+                        Item: {
+                          connectionId: event.requestContext.connectionId,
+                        },
+                      })
+                      .promise();
+                  } catch (err) {
+                    return {
+                      statusCode: 500,
+                    };
+                  }
+                  return {
+                    statusCode: 200,
+                  };
+                };
+      Role: !GetAtt
+        - ConnectHandlerServiceRole2301
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref ConnectionsTable2301
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - ConnectHandlerServiceRoleDefaultPolicy2301
+      - ConnectHandlerServiceRole2301
+  DisconnectHandlerServiceRole2301:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join
+          - ""
+          - - "arn:"
+            - !Ref "AWS::Partition"
+            - ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  DisconnectHandlerServiceRoleDefaultPolicy2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "dynamodb:BatchWriteItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:Scan"
+            Effect: Allow
+            Resource:
+              - !GetAtt
+                - ConnectionsTable2301
+                - Arn
+              - !Ref "AWS::NoValue"
+          - Action: "execute-api:ManageConnections"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:aws:execute-api:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":"
+                - !Ref WebsocketApi2301
+                - /dev/POST/@connections/*
+        Version: 2012-10-17
+      PolicyName: DisconnectHandlerServiceRoleDefaultPolicy2301
+      Roles:
+        - !Ref DisconnectHandlerServiceRole2301
+  DisconnectHandler2301:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require("aws-sdk");
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          exports.handler = async function (event, context) {
+            const source = event.requestContext.connectionId;
+            // set up connections object so we can scan the table
+            console.log("before setting up connection to table");
+            let connections;
+            try {
+              connections = await ddb.scan({ TableName: process.env.table }).promise();
+            } catch (err) {
+              console.log("could not connect to db table");
+              return {
+                statusCode: 500,
+              };
+            }
+            // before we delete...grab the room we are in (if we are in one)
+            const row = connections.Items.filter(
+              ({ connectionId }) => connectionId === source
+            )[0]; // find row where roomId exists
+
+            console.log("line 19 row", row);
+            const myRoomId = row && row.roomId;
+
+            if (myRoomId) {
+              // send message to peer in same room (if there is one)
+              const row = connections.Items.filter(
+                ({ roomId, connectionId }) =>
+                  roomId === myRoomId && connectionId !== source // make sure we are not sending to ourself
+              )[0]; // find row where roomId exists
+              const targetConnectionId = row && row.connectionId;
+              console.log("inside room, targetConnection in row", row);
+              if (targetConnectionId) {
+                const callbackAPI = new AWS.ApiGatewayManagementApi({
+                  apiVersion: "2018-11-29",
+                  endpoint:
+                    event.requestContext.domainName + "/" + event.requestContext.stage,
+                });
+                await callbackAPI
+                  .postToConnection({
+                    ConnectionId: targetConnectionId,
+                    Data: JSON.stringify({ type: "endConnection" }),
+                  })
+                  .promise();
+              }
+            }
+
+            console.log("deleting key", source);
+            await ddb
+              .delete({
+                TableName: process.env.table,
+                Key: {
+                  connectionId: source,
+                },
+              })
+              .promise();
+            return {
+              statusCode: 200,
+            };
+          };
+      Role: !GetAtt
+        - DisconnectHandlerServiceRole2301
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref ConnectionsTable2301
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - DisconnectHandlerServiceRoleDefaultPolicy2301
+      - DisconnectHandlerServiceRole2301
+  MessageHandlerServiceRole2301:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join
+          - ""
+          - - "arn:"
+            - !Ref "AWS::Partition"
+            - ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  MessageHandlerServiceRoleDefaultPolicy2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "dynamodb:BatchGetItem"
+              - "dynamodb:GetRecords"
+              - "dynamodb:GetShardIterator"
+              - "dynamodb:Query"
+              - "dynamodb:GetItem"
+              - "dynamodb:Scan"
+              - "dynamodb:ConditionCheckItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:UpdateItem"
+            Effect: Allow
+            Resource:
+              - !GetAtt
+                - ConnectionsTable2301
+                - Arn
+              - !Ref "AWS::NoValue"
+          - Action: "execute-api:ManageConnections"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:aws:execute-api:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":"
+                - !Ref WebsocketApi2301
+                - /dev/POST/@connections/*
+        Version: 2012-10-17
+      PolicyName: MessageHandlerServiceRoleDefaultPolicy2301
+      Roles:
+        - !Ref MessageHandlerServiceRole2301
+  MessageHandler2301:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |-
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const {
+            DynamoDBDocumentClient,
+            ScanCommand,
+            PutCommand,
+          } = require("@aws-sdk/lib-dynamodb");
+
+          const {
+            ApiGatewayManagementApiClient,
+            PostToConnectionCommand,
+          } = require("@aws-sdk/client-apigatewaymanagementapi");
+
+          const TABLE_NAME = process.env.table || "ConnectionsTable2301"; // TODO: Remove hard coded table later
+          const REGION = process.env.AWS_REGION || "us-east-2";
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const constructResponseCommand = (connectionId, jsonData) => {
+            return new PostToConnectionCommand({
+              ConnectionId: connectionId,
+              Data: JSON.stringify(jsonData),
+            });
+          };
+
+          exports.handler = async function (event) {
+            console.log("Lambda is invoked!");
+            let connections;
+            try {
+              console.log("Start Db scan...");
+              console.log("dynamo object: ", dynamo);
+              console.log("table name: ", TABLE_NAME);
+              connections = await dynamo.send(new ScanCommand({ TableName: TABLE_NAME }));
+              console.log("Db scan complete");
+            } catch (err) {
+              return {
+                statusCode: 500,
+              };
+            }
+            const callbackAPI = new ApiGatewayManagementApiClient({
+              endpoint:
+                "https://" +
+                event.requestContext.domainName +
+                "/" +
+                event.requestContext.stage,
+            });
+
+            const message = JSON.parse(event.body).message;
+
+            if (message.type === "joinOrCreate") {
+              const source = event.requestContext.connectionId;
+              const destination = message.payload;
+              console.log("source and destination", source, destination);
+
+              const targetItem = connections.Items.filter(
+                ({ roomId }) => roomId === destination
+              )[0]; // find row where roomId exists
+
+              console.log("line 42 targetItem", targetItem);
+              const targetConnectionId = targetItem && targetItem.connectionId;
+
+              try {
+                await dynamo.send(
+                  new PutCommand({
+                    TableName: TABLE_NAME,
+                    Item: {
+                      connectionId: source,
+                      roomId: destination,
+                    },
+                  })
+                );
+                console.log("Room was joined by ", source);
+              } catch (err) {
+                return {
+                  statusCode: 500,
+                };
+              }
+
+              // if peer in room exists
+              if (targetConnectionId) {
+                const messageToSelf = {
+                  type: "roomId",
+                  payload: targetConnectionId,
+                };
+                await callbackAPI.send(constructResponseCommand(source, messageToSelf));
+                console.log("sent out my Peer Id to myself line 74");
+
+                const messageToPeer = {
+                  type: "startConnection",
+                  payload: source,
+                };
+
+                console.log(messageToPeer);
+
+                try {
+                  await callbackAPI.send(
+                    constructResponseCommand(targetConnectionId, messageToPeer)
+                  );
+                  console.log("sent out message to the other peer line 90");
+                } catch (E) {
+                  console.log(E);
+                }
+              }
+            } else {
+              if (message.type === "endConnection") {
+                console.log("endConnection -- message payload: ", message.payload);
+                const targetItem = connections.Items.filter(
+                  ({ roomId }) => roomId === message.payload
+                )[0]; // find row where roomId exists
+
+                console.log("targetItem:", targetItem);
+                const targetConnectionId = targetItem && targetItem.connectionId;
+                if (targetConnectionId) {
+                  await callbackAPI.send(
+                    constructResponseCommand(targetConnectionId, message)
+                  );
+                  console.log("sent out message to the other peer line 120");
+                }
+                return { statusCode: 200 };
+              }
+
+              const source = event.requestContext.connectionId;
+              const targetItem = connections.Items.filter(
+                ({ connectionId }) => connectionId === source
+              )[0];
+
+              const room = targetItem.roomId;
+
+              if (!room) {
+                console.log("Not in a room!", targetItem, source);
+                return { statusCode: 200 };
+              }
+
+              console.log("found room, now finding peer", room);
+
+              let targetConnectionId = connections.Items.filter(
+                ({ connectionId, roomId }) => roomId === room && connectionId !== source
+              )[0];
+
+              targetConnectionId = targetConnectionId && targetConnectionId.connectionId;
+
+              console.log("found targetConnectionId", targetConnectionId);
+
+              if (targetConnectionId) {
+                await callbackAPI.send(
+                  constructResponseCommand(targetConnectionId, message)
+                );
+                console.log("sent out message to the other peer");
+              }
+            }
+            return { statusCode: 200 };
+          };
+      Role: !GetAtt
+        - MessageHandlerServiceRole2301
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref ConnectionsTable2301
+      Handler: index.handler
+      Runtime: nodejs18.x
+    DependsOn:
+      - MessageHandlerServiceRoleDefaultPolicy2301
+      - MessageHandlerServiceRole2301
+  DefaultHandlerServiceRole2301:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join
+          - ""
+          - - "arn:"
+            - !Ref "AWS::Partition"
+            - ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  DefaultHandlerServiceRoleDefaultPolicy2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: "execute-api:ManageConnections"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:aws:execute-api:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":"
+                - !Ref WebsocketApi2301
+                - /dev/POST/@connections/*
+          - Action: "execute-api:ManageConnections"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:aws:execute-api:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":"
+                - !Ref WebsocketApi2301
+                - /dev/GET/@connections/*
+        Version: 2012-10-17
+      PolicyName: DefaultHandlerServiceRoleDefaultPolicy2301
+      Roles:
+        - !Ref DefaultHandlerServiceRole2301
+  DefaultHandler2301:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require('aws-sdk');
+
+                exports.handler = async function (event, context) {
+                  let connectionInfo;
+                  let connectionId = event.requestContext.connectionId;
+                
+                  const callbackAPI = new AWS.ApiGatewayManagementApi({
+                    apiVersion: '2018-11-29',
+                    endpoint:
+                      event.requestContext.domainName + '/' + event.requestContext.stage,
+                  });
+                
+                  try {
+                    connectionInfo = await callbackAPI
+                      .getConnection({ ConnectionId: event.requestContext.connectionId })
+                      .promise();
+                  } catch (e) {
+                    console.log(e);
+                  }
+                
+                  connectionInfo.connectionID = connectionId;
+                
+                  await callbackAPI
+                    .postToConnection({
+                      ConnectionId: event.requestContext.connectionId,
+                      Data:
+                        'Use the sendmessage route to send a message. Your info:' +
+                        JSON.stringify(connectionInfo),
+                    })
+                    .promise();
+                
+                  return {
+                    statusCode: 200,
+                  };
+                };
+      Role: !GetAtt
+        - DefaultHandlerServiceRole2301
+        - Arn
+      Handler: index.handler
+      Runtime: nodejs18.x
+    DependsOn:
+      - DefaultHandlerServiceRoleDefaultPolicy2301
+      - DefaultHandlerServiceRole2301
+  WebsocketApi2301:
+    Type: "AWS::ApiGatewayV2::Api"
+    Properties:
+      Name: WebsocketAPIGateway
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+  WebsocketApiconnectRouteConnectIntegrationPermission2301:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - ConnectHandler2301
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref WebsocketApi2301
+          - /*/$connect
+  WebsocketApiconnectRouteConnectIntegration2301:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt
+            - ConnectHandler2301
+            - Arn
+          - /invocations
+  WebsocketApiconnectRoute2301:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Join
+        - ""
+        - - integrations/
+          - !Ref WebsocketApiconnectRouteConnectIntegration2301
+  WebsocketApidisconnectRouteDisconnectIntegrationPermission2301:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - DisconnectHandler2301
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref WebsocketApi2301
+          - /*/$disconnect
+  WebsocketApidisconnectRouteDisconnectIntegration2301:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt
+            - DisconnectHandler2301
+            - Arn
+          - /invocations
+  WebsocketApidisconnectRoute2301:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Join
+        - ""
+        - - integrations/
+          - !Ref WebsocketApidisconnectRouteDisconnectIntegration2301
+  WebsocketApidefaultRouteDefaultIntegrationPermission2301:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - DefaultHandler2301
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref WebsocketApi2301
+          - /*/$default
+  WebsocketApidefaultRouteDefaultIntegration2301:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt
+            - DefaultHandler2301
+            - Arn
+          - /invocations
+  WebsocketApidefaultRoute2301:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Join
+        - ""
+        - - integrations/
+          - !Ref WebsocketApidefaultRouteDefaultIntegration2301
+  WebsocketApisendmessageRouteMessageHandlerPermission2301:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - MessageHandler2301
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref WebsocketApi2301
+          - /*/sendmessage
+  WebsocketApisendmessageRouteMessageHandler2301:
+    Type: "AWS::ApiGatewayV2::Integration"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt
+            - MessageHandler2301
+            - Arn
+          - /invocations
+  WebsocketApisendmessageRoute2301:
+    Type: "AWS::ApiGatewayV2::Route"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      RouteKey: sendmessage
+      AuthorizationType: NONE
+      Target: !Join
+        - ""
+        - - integrations/
+          - !Ref WebsocketApisendmessageRouteMessageHandler2301
+  devF7B884FF:
+    Type: "AWS::ApiGatewayV2::Stage"
+    Properties:
+      ApiId: !Ref WebsocketApi2301
+      StageName: dev
+      AutoDeploy: true
+  manageConnections2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: "execute-api:ManageConnections"
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - "arn:aws:execute-api:"
+                - !Ref "AWS::Region"
+                - ":"
+                - !Ref "AWS::AccountId"
+                - ":"
+                - !Ref WebsocketApi2301
+                - /dev/POST/@connections/*
+        Version: 2012-10-17
+      PolicyName: manageConnections2301
+      Roles:
+        - !Ref MessageHandlerServiceRole2301
+Outputs:
+  ConnectionsTableStreamArn:
+    Value: !GetAtt ConnectionsTable2301.StreamArn
+    Export:
+      Name: !Sub "${AWS::StackName}-StreamArn"
+  WebSocketAPIGatewayEndpoint:
+    Value: !Sub "wss://${WebsocketApi2301}.execute-api.${AWS::Region}.amazonaws.com/dev"
