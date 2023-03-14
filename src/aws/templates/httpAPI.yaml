@@ -214,11 +214,6 @@ Resources:
       Name: MyHTTPAPIGateway
       ProtocolType: HTTP
       RouteSelectionExpression: "${request.method} ${request.path}"
-
-  ApiGatewayCors:
-    Type: AWS::ApiGatewayV2::Cors
-    Properties:
-      ApiId: !Ref ApiGateway
       CorsConfiguration:
         AllowOrigins:
           - "*"
@@ -233,6 +228,25 @@ Resources:
         AllowHeaders:
           - "*"
         MaxAge: 86400
+
+  # ApiGatewayCors:
+  #   Type: AWS::ApiGatewayV2::Cors
+  #   Properties:
+  #     ApiId: !Ref ApiGateway
+  #     CorsConfiguration:
+  #       AllowOrigins:
+  #         - "*"
+  #       AllowMethods:
+  #         - "GET"
+  #         - "POST"
+  #         - "PUT"
+  #         - "DELETE"
+  #         - "HEAD"
+  #         - "OPTIONS"
+  #         - "PATCH"
+  #       AllowHeaders:
+  #         - "*"
+  #       MaxAge: 86400
 
   RoomsRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -602,8 +616,6 @@ Resources:
               console.log("roomResource: ", roomResource);
               // create the room if it doesn't exist
               if (!roomResource || roomResource.roomId === undefined) {
-                console.log("roomResource: line 100: ", roomResource);
-                console.log("roomResource.id:", roomResource.roomId);
                 roomResource = await createRoom(config);
               }
 
@@ -703,3 +715,6 @@ Resources:
           - ":"
           - !Ref ApiGateway
           - /*/*
+Outputs:
+  APIGateWayEndpoint:
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/dev"

@@ -1,0 +1,706 @@
+# Parameters:
+#   SignalingStackName:
+#     Type: String
+#     Default: SignalingStack
+Resources:
+  RoomCountsTable2301:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: "RoomCountsTable2301"
+      KeySchema:
+        - AttributeName: roomId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: roomId
+          AttributeType: S
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+
+  DynamoDBLambdaPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "DynamoDBLambdaPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "dynamodb:DescribeStream"
+              - "dynamodb:GetRecords"
+              - "dynamodb:GetShardIterator"
+              - "dynamodb:ListStreams"
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ConnectionsTable2301/stream/*"
+          - Effect: Allow
+            Action:
+              - "dynamodb:UpdateItem"
+              - "dynamodb:GetItem"
+              - "dynamodb:ListStreams"
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${RoomCountsTable2301}"
+      Roles:
+        - !Ref CrossTableLambdaExecutionRole
+
+  TableChangeLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { unmarshall } = require("@aws-sdk/util-dynamodb");
+          const {
+            DynamoDBDocumentClient,
+            UpdateCommand,
+            GetCommand,
+          } = require("@aws-sdk/lib-dynamodb");
+
+          const TABLE_NAME = "RoomCountsTable2301";
+          const REGION = process.env.AWS_REGION || "us-east-2";
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const getNewStatusOnConnect = (prevStatus) => {
+            let newStatus;
+            switch (prevStatus) {
+              case "open":
+                newStatus = "occupied";
+                break;
+              case "occupied":
+                newStatus = "full";
+                break;
+              default:
+                throw new Error(`Cannot change the status from ${prevStatus}`);
+            }
+
+            return newStatus;
+          };
+
+          const getNewStatusOnDisconnect = (prevStatus) => {
+            let newStatus;
+            switch (prevStatus) {
+              case "full":
+                newStatus = "occupied";
+                break;
+              case "occupied":
+                newStatus = "closed";
+                break;
+              default:
+                throw new Error(`Cannot change the status from ${prevStatus}`);
+            }
+
+            return newStatus;
+          };
+
+          const updateRoomStatusById = async (roomId, status) => {
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { roomId },
+              UpdateExpression: "set #current_status = :s",
+              ExpressionAttributeNames: { "#current_status": "status" },
+              ExpressionAttributeValues: { ":s": status },
+            };
+
+            await dynamo.send(new UpdateCommand(params));
+          };
+
+          const getRoomStatusById = async (roomId) => {
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { roomId },
+            };
+            console.log("inside getRoomStatusById, params:", params);
+
+            const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            console.log("Item: ", dataFromDatabase.Item);
+            const roomResource = dataFromDatabase.Item ? dataFromDatabase.Item : null;
+
+            if (roomResource && roomResource.status) return roomResource.status;
+
+            return null;
+          };
+
+          const extractRecordData = (record) => {
+            let dynamoDbRecord;
+            if (record.eventName === "INSERT" || record.eventName === "MODIFY") {
+              dynamoDbRecord = record.dynamodb.NewImage;
+            } else {
+              dynamoDbRecord = record.dynamodb.OldImage;
+            }
+
+            return unmarshall(dynamoDbRecord);
+          };
+
+          exports.handler = async (event) => {
+            const record = event.Records[0];
+
+            console.log("event: ", event);
+            console.log("records:", event.Records);
+            console.log("record length:", event.Records.length);
+            console.log("Event name:", record.eventName);
+            console.log("new image: ", record.dynamodb.NewImage);
+            console.log("old image: ", record.dynamodb.OldImage);
+
+            const recordData = extractRecordData(record);
+            const { roomId } = recordData;
+            // Guard clauses before talking with db
+            if (record.eventName === "INSERT") return;
+            if (!roomId) {
+              console.log("Database change does not have a room ID attach to it. Abort.");
+              return;
+            }
+
+            console.log("ROOM ID CAPTURED: ", roomId);
+
+            try {
+              const prevStatus = await getRoomStatusById(roomId);
+              console.log("prevStatus: ", prevStatus);
+              if (!prevStatus) {
+                console.log(`The status of the room ${roomId} is missing. Abort.`);
+                return;
+              }
+
+              let newStatus;
+
+              switch (record.eventName) {
+                case "MODIFY":
+                  // a peer connected with a specific room
+                  newStatus = getNewStatusOnConnect(prevStatus);
+                  break;
+                case "REMOVE":
+                  // a peer disconnect from a specific room
+                  newStatus = getNewStatusOnDisconnect(prevStatus);
+                  break;
+                default:
+                  return;
+              }
+              await updateRoomStatusById(roomId, newStatus);
+              console.log("Room status updated!");
+            } catch (err) {
+              console.log("Error while updating the database:", err);
+            }
+          };
+      Role: !GetAtt
+        - CrossTableLambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref RoomCountsTable2301
+      Handler: index.handler
+      Runtime: nodejs18.x
+    DependsOn:
+      - DynamoDBLambdaPolicy
+      - CrossTableLambdaExecutionRole
+
+  LambdaToDynamoDBStreamMapping:
+    Type: "AWS::Lambda::EventSourceMapping"
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn:
+        Fn::ImportValue: "NewTestSignalStack-StreamArn"
+      FunctionName: !Ref TableChangeLambdaFunction
+      StartingPosition: LATEST
+
+  ApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: MyHTTPAPIGateway
+      StageName: v1
+      ProtocolType: HTTP
+      RouteSelectionExpression: "${request.method} ${request.path}"
+
+  ApiGatewayCors:
+    Type: AWS::ApiGatewayV2::Cors
+    Properties:
+      ApiId: !Ref ApiGateway
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "HEAD"
+          - "OPTIONS"
+          - "PATCH"
+        AllowHeaders:
+          - "*"
+        MaxAge: 86400
+
+  RoomsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: "GET /rooms/{id}"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${RoomsGetIntegration}"
+
+  CreateRoomRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: "POST /createRoom"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${CreateRoomIntegration}"
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${DefaultRouteIntegration}"
+
+  DefaultRouteIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DefaultLambdaFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
+
+  RoomsGetIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RoomsGetFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
+
+  CreateRoomIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateRoomFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
+
+  DefaultLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          exports.handler = async (event, context) => {
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Unknown route. Supported routes include GET /rooms/roomId and POST /createRoom' })
+            };
+          }
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+      Handler: index.handler
+      Runtime: nodejs18.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+
+  RoomsGetFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
+          const { GetCommand, ScanCommand } = require("@aws-sdk/lib-dynamodb");
+
+          const createErrorResponse = (message) => {
+            return { message };
+          };
+
+          const TABLE_NAME = "RoomCountsTable2301";
+          const REGION = process.env.AWS_REGION || "us-east-2";
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const getRoomById = async (roomId) => {
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { roomId },
+            };
+
+            const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            return dataFromDatabase.Item ? dataFromDatabase.Item : null;
+          };
+
+          const getRoomByName = async (name) => {
+            console.log(name);
+            const params = {
+              TableName: TABLE_NAME,
+              FilterExpression: "#unique = :name",
+              ExpressionAttributeValues: {
+                ":name": name,
+              },
+              ExpressionAttributeNames: { "#unique": "unique_name" },
+            };
+
+            const dataFromDatabase = await dynamo.send(new ScanCommand(params));
+            const item = dataFromDatabase.Items ? dataFromDatabase.Items[0] : null;
+
+            return item;
+          };
+
+          const getRoomResource = async (uniqueIdentifier) => {
+            let roomResource = null;
+            if (uniqueIdentifier) {
+              if (uniqueIdentifier.startsWith("rm_")) {
+                roomResource = await getRoomById(uniqueIdentifier);
+              } else {
+                roomResource = await getRoomByName(uniqueIdentifier);
+              }
+            }
+
+            return roomResource;
+          };
+
+          exports.handler = async (event) => {
+            try {
+              console.log("pathParameters: ", event.pathParameters);
+              console.log("event: ", event);
+              if (event.pathParameters && event.pathParameters.id) {
+                const { id } = event.pathParameters;
+                const roomResource = await getRoomResource(id);
+                if (roomResource) {
+                  return {
+                    statusCode: 200,
+                    body: JSON.stringify(roomResource),
+                  };
+                } else {
+                  return {
+                    statusCode: 404,
+                    body: JSON.stringify(
+                      createErrorResponse(`Room ${id} does not exist.`)
+                    ),
+                  };
+                }
+              } else {
+                return {
+                  statusCode: 400,
+                  body: JSON.stringify(
+                    createErrorResponse(
+                      "No room ID or room name specified. Please check your request and try again"
+                    )
+                  ),
+                };
+              }
+            } catch (err) {
+              console.log(err);
+              return {
+                statusCode: 500,
+                body: JSON.stringify(
+                  createErrorResponse(
+                    "Error when creating the new room. Please try again."
+                  )
+                ),
+              };
+            }
+          };
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref RoomCountsTable2301
+      Handler: index.handler
+      Runtime: nodejs18.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+      - LambdaExecutionRole
+
+  CrossTableLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: "CloudWatchLogsPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: "CloudWatchLogsPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+
+  LambdaDefaultPolicy2301:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:Query
+              - dynamodb:GetItem
+              - dynamodb:Scan
+              - dynamodb:ConditionCheckItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - !GetAtt
+                - RoomCountsTable2301
+                - Arn
+              - !Ref "AWS::NoValue"
+        Version: 2012-10-17
+      PolicyName: LambdaDefaultPolicy2301
+      Roles:
+        - !Ref LambdaExecutionRole
+
+  CreateRoomFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
+          const {
+            PutCommand,
+            GetCommand,
+            ScanCommand,
+          } = require("@aws-sdk/lib-dynamodb");
+          const crypto = require("crypto");
+
+          const createErrorResponse = (message) => {
+            return { message };
+          };
+
+          const generateRoomId = () => {
+            const id = "rm_" + crypto.randomUUID();
+            return id;
+          };
+
+          const TABLE_NAME = "RoomCountsTable2301";
+          const REGION = process.env.AWS_REGION || "us-east-2";
+          const marshallOptions = {
+            removeUndefinedValues: true, // false, by default.
+          };
+
+          const client = new DynamoDBClient({ region: REGION });
+          const dynamo = DynamoDBDocumentClient.from(client, {
+            marshallOptions,
+          });
+
+          const createRoom = async (config) => {
+            const roomId = generateRoomId(); // create room id with length of 10
+            const now = new Date();
+            const utc = now.toUTCString();
+            const roomResource = {
+              roomId,
+              unique_name: config.uniqueName || "",
+              created_at: utc,
+              updated_at: utc,
+              status: "open",
+            };
+            const params = {
+              TableName: TABLE_NAME,
+              Item: roomResource,
+            };
+            await dynamo.send(new PutCommand(params));
+            return roomResource;
+          };
+
+          const getRoomById = async (roomId) => {
+            console.log("inside getRoomById: ", roomId);
+            const params = {
+              TableName: TABLE_NAME,
+              Key: { roomId },
+            };
+
+            const dataFromDatabase = await dynamo.send(new GetCommand(params));
+            console.log("dataFromDatabase: ", dataFromDatabase);
+            return dataFromDatabase.Item ? dataFromDatabase.Item : null;
+          };
+
+          const getRoomByName = async (name) => {
+            console.log(name);
+            const params = {
+              TableName: TABLE_NAME,
+              FilterExpression: "#unique = :name",
+              ExpressionAttributeValues: {
+                ":name": name,
+              },
+              ExpressionAttributeNames: { "#unique": "unique_name" },
+            };
+
+            const dataFromDatabase = await dynamo.send(new ScanCommand(params));
+            const item = dataFromDatabase.Items ? dataFromDatabase.Items[0] : null;
+
+            return item;
+          };
+
+          const getRoomResource = async (uniqueIdentifier) => {
+            let roomResource = null;
+            if (uniqueIdentifier) {
+              if (uniqueIdentifier.startsWith("rm_")) {
+                console.log("room starts with 'rm'");
+                roomResource = await getRoomById(uniqueIdentifier);
+              } else {
+                console.log("room name route");
+                roomResource = await getRoomByName(uniqueIdentifier);
+              }
+            }
+
+            return roomResource;
+          };
+
+          exports.handler = async (event) => {
+            let roomResource;
+            try {
+              const config = event.body ? JSON.parse(event.body) : {};
+              const uniqueIdentifier = config.uniqueName;
+              // check whether the roomId/name exists or not
+              roomResource = await getRoomResource(uniqueIdentifier);
+              console.log("roomResource: ", roomResource);
+              // create the room if it doesn't exist
+              if (!roomResource || roomResource.roomId === undefined) {
+                console.log("roomResource: line 100: ", roomResource);
+                console.log("roomResource.id:", roomResource.roomId);
+                roomResource = await createRoom(config);
+              }
+
+              return {
+                statusCode: 200,
+                headers: {
+                  "Access-Control-Allow-Headers": "Content-Type",
+                  "Access-Control-Allow-Origin": "*",
+                  "Access-Control-Allow-Methods": "OPTIONS,POST",
+                },
+                body: JSON.stringify(roomResource),
+              };
+            } catch (err) {
+              console.log(err);
+              return {
+                statusCode: 500,
+                body: JSON.stringify(
+                  createErrorResponse(
+                    "Error when getting or creating the new room. Please try again."
+                  )
+                ),
+              };
+            }
+          };
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref RoomCountsTable2301
+      Handler: index.handler
+      Runtime: nodejs18.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+      - LambdaExecutionRole
+
+  stageDev:
+    Type: "AWS::ApiGatewayV2::Stage"
+    Properties:
+      ApiId: !Ref ApiGateway
+      StageName: dev
+      AutoDeploy: true
+  HTTPAPIGetRoomsLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - RoomsGetFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref ApiGateway
+          - /*/*
+  HTTPAPICreateRoomLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - CreateRoomFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref ApiGateway
+          - /*/*
+  HTTPAPIDefaultLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt
+        - DefaultLambdaFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":execute-api:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref "AWS::AccountId"
+          - ":"
+          - !Ref ApiGateway
+          - /*/*
