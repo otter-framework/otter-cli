@@ -9,7 +9,8 @@ import { errorHandler } from "../utils/errorHandler.js";
 const createdStacks = config.get("createdStacks") as string[];
 const aws = new AwsServices();
 
-export class Deploy extends Command {
+// main `destroy` command logic
+export class Destroy extends Command {
   static description = "destroy otter aws infrastructure";
 
   async run(): Promise<void> {

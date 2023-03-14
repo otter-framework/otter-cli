@@ -5,6 +5,12 @@ import * as ui from "../utils/ui.js";
 import { config } from "../utils/config.js";
 import { AwsCredentialIdentity } from "@aws-sdk/types";
 
+type preAnswer = {
+  region?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+};
+
 const accessKeyIdQuestion: DistinctQuestion = {
   type: "input",
   name: "accessKeyId",
@@ -52,15 +58,19 @@ export const GetAwsInfo = async (): Promise<Answers> => {
   }
 
   // extract known info from config, prefill the answer
-  let preAnswered;
-  const accessKeyId = config.get("accessKeyId");
-  const secretAccessKey = config.get("secretAccessKey");
-  const region = config.get("region");
-  if (region) ui.display(`Your region: ${ui.highlight(region)}\n`);
+
+  let preAnswered: preAnswer = {};
+  const accessKeyId = config.get("accessKeyId") as string;
+  const secretAccessKey = config.get("secretAccessKey") as string;
+  const region = config.get("region") as string;
+
+  if (region) {
+    ui.display(`Your region: ${ui.highlight(region)}\n`);
+    preAnswered["region"] = region;
+  }
+
   if (accessKeyId && secretAccessKey) {
-    preAnswered = { accessKeyId, secretAccessKey, region };
-  } else {
-    preAnswered = { region };
+    preAnswered = { ...preAnswered, accessKeyId, secretAccessKey };
   }
 
   // ask questions based on what we've known
@@ -69,7 +79,11 @@ export const GetAwsInfo = async (): Promise<Answers> => {
     { ...preAnswered }
   );
 
-  config.set({ region: answers.region });
+  config.set({
+    region: answers.region,
+    accessKeyId: answers.accessKeyId,
+    secretAccessKey: answers.secretAccessKey,
+  });
 
   // format return object for AWS client use
   const AwsInfo = {
