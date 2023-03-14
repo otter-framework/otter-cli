@@ -13,6 +13,7 @@ import { deployErrorHandler } from "../utils/errorHandler.js";
 
 const aws = new AwsServices();
 
+// deploy stack helper function
 const deployStack = async (stack: StackDescription) => {
   let spinner = ui.spinner(stack.initiateMessage);
   const stackId = await aws
