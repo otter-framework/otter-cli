@@ -30,7 +30,7 @@ export class Destroy extends Command {
 
     // start teardown process
     ui.display(
-      "\n🚜 Otter infrastructure is being removed and might take a few minutes\n"
+      "\n🚜 Otter infrastructure is being removed. It will take a while, please check back after 10 - 15 minutes.\n"
     );
 
     let spinner = ui.emptySpinner();
