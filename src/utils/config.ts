@@ -30,6 +30,11 @@ const schema = {
     type: "string",
     default: "",
   },
+
+  loadBalancerEndpoint: {
+    type: "string",
+    default: "",
+  },
 };
 
 export const config = new Conf({

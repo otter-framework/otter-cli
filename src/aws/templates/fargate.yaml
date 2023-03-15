@@ -513,3 +513,6 @@ Resources:
         - !Ref MySecurityGroup
       PrivateIpAddress: 10.0.1.25
       SourceDestCheck: true
+Outputs:
+  LoadBalancerEndpoint:
+    Value: !GetAtt OtterCoturnNLB.DNSName

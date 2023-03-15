@@ -6,6 +6,7 @@ import {
   stacks,
   apiStack,
   signalStack,
+  turnStack,
 } from "../utils/stackDescriptions.js";
 import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
@@ -58,14 +59,21 @@ export class Deploy extends Command {
       .getApiEndpoint(signalStack.name)
       .catch((err) => deployErrorHandler(err, spinner));
     config.set({ webSocketEndpoint });
+    const loadBalancerEndpoint = await aws
+      .getApiEndpoint(turnStack.name)
+      .catch((err) => deployErrorHandler(err, spinner));
+    config.set({ loadBalancerEndpoint });
     spinner.succeed(ui.secondary("Resource information acquired"));
 
     // summary and goodbye
     ui.printOtter();
     ui.display(`\n${ui.otterGradient(ui.logo)}\n`);
     ui.success("\n🎉 Deployment completed successfully 🎉\n");
-    ui.display(`- You API endpoint: ${ui.highlight(apiEndpoint)}`);
-    ui.display(`- You WebSocket endpoint: ${ui.highlight(webSocketEndpoint)}`);
+    ui.display(`- API endpoint: ${ui.highlight(apiEndpoint)}`);
+    ui.display(`- YWebSocket endpoint: ${ui.highlight(webSocketEndpoint)}`);
+    ui.display(
+      `- STUN/TURN URL: ${ui.highlight(`turn:${loadBalancerEndpoint}:80`)}`
+    );
     ui.display(`- Your Otter configuration file: ${ui.highlight(config.path)}`);
 
     ui.display("\nThank you for using Otter, see you next time! 👋");
