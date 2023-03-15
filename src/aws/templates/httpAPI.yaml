@@ -229,30 +229,11 @@ Resources:
           - "*"
         MaxAge: 86400
 
-  # ApiGatewayCors:
-  #   Type: AWS::ApiGatewayV2::Cors
-  #   Properties:
-  #     ApiId: !Ref ApiGateway
-  #     CorsConfiguration:
-  #       AllowOrigins:
-  #         - "*"
-  #       AllowMethods:
-  #         - "GET"
-  #         - "POST"
-  #         - "PUT"
-  #         - "DELETE"
-  #         - "HEAD"
-  #         - "OPTIONS"
-  #         - "PATCH"
-  #       AllowHeaders:
-  #         - "*"
-  #       MaxAge: 86400
-
   RoomsRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ApiGateway
-      RouteKey: "GET /rooms/{id}"
+      RouteKey: "GET /room/{id}"
       AuthorizationType: NONE
       Target: !Sub "integrations/${RoomsGetIntegration}"
 
