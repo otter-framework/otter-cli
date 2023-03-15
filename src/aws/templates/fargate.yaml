@@ -37,10 +37,9 @@ Resources:
       CidrBlock: 0.0.0.0/0
       Egress: false
       NetworkAclId: !Ref MyNetworkACL
-      Protocol: "-1"  # Set to all traffic types
+      Protocol: "-1" # Set to all traffic types
       RuleAction: allow
-      RuleNumber: "105"  # Change the rule number as needed
-
+      RuleNumber: "105" # Change the rule number as needed
 
   MyOutboundRule:
     Type: "AWS::EC2::NetworkAclEntry"
@@ -334,7 +333,6 @@ Resources:
               awslogs-group: /ecs/fargate-task-definition
               awslogs-region: !Sub "${AWS::Region}"
               awslogs-stream-prefix: ecs
-          Name: sample-fargate-app
           PortMappings:
             - ContainerPort: 80
               HostPort: 80
@@ -447,19 +445,19 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
-          SecurityGroups: 
+          SecurityGroups:
             - !Ref MySecurityGroup
-          Subnets: 
+          Subnets:
             - !Ref MySubnet
       TaskDefinition: !Ref taskdefinition
       LoadBalancers:
-        - ContainerName: sample-fargate-app
+        - ContainerName: otter-coturn-server
           ContainerPort: 80
           TargetGroupArn: !Ref OtterCoturnTargetGroup
-    DependsOn: 
+    DependsOn:
       - OtterCoturnNLB
       - OtterCoturnListener
-  
+
   OtterCoturnTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -468,18 +466,17 @@ Resources:
       Protocol: UDP
       Port: 80
       VpcId: !Ref MyVPC
-    DependsOn: 
+    DependsOn:
       - MyInternetGatewayAttachment
       - OtterCoturnNLB
-    
-        
+
   OtterCoturnNLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: otter-coturn-nlb
       Scheme: internet-facing
       IpAddressType: ipv4
-      Subnets: 
+      Subnets:
         - !Ref MySubnet
       Type: network
       LoadBalancerAttributes:
@@ -489,8 +486,7 @@ Resources:
         - Key: Name
           Value: OtterCoturnNLB
     DependsOn: MyInternetGateway
-    
-    
+
   OtterCoturnListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -500,7 +496,7 @@ Resources:
       LoadBalancerArn: !Ref OtterCoturnNLB
       Port: 80
       Protocol: UDP
-    DependsOn: 
+    DependsOn:
       - OtterCoturnTargetGroup
       - OtterCoturnNLB
 
@@ -508,7 +504,7 @@ Resources:
     Type: AWS::EC2::NetworkInterface
     Properties:
       SubnetId: !Ref MySubnet
-      Description: My network interface test 
+      Description: My network interface test
       GroupSet:
         - !Ref MySecurityGroup
       PrivateIpAddress: 10.0.1.25

@@ -70,7 +70,7 @@ export class Deploy extends Command {
     ui.display(`\n${ui.otterGradient(ui.logo)}\n`);
     ui.success("\n🎉 Deployment completed successfully 🎉\n");
     ui.display(`- API endpoint: ${ui.highlight(apiEndpoint)}`);
-    ui.display(`- YWebSocket endpoint: ${ui.highlight(webSocketEndpoint)}`);
+    ui.display(`- WebSocket endpoint: ${ui.highlight(webSocketEndpoint)}`);
     ui.display(
       `- STUN/TURN URL: ${ui.highlight(`turn:${loadBalancerEndpoint}:80`)}`
     );
