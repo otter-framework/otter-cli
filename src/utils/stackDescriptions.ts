@@ -7,6 +7,15 @@ export type StackDescription = {
   deployCompleteMessage: string;
 };
 
+export const cloudFrontStack: StackDescription = {
+  name: "CloudFrontStack",
+  template: "/templates/cloudFront.yaml",
+  initiateMessage: "Initiating CloudFront Stack deployment...",
+  initiateCompleteMessage: "CloudFront Stack deployment initiated",
+  deployingMessage: "Deploying CloudFront Stack...",
+  deployCompleteMessage: "CloudFront Stack deployed",
+};
+
 export const signalStack: StackDescription = {
   name: "NewTestSignalStack",
   template: "/templates/signaling.yaml",
@@ -34,4 +43,9 @@ export const turnStack: StackDescription = {
   deployCompleteMessage: "Otter STUN/TURN cluster deployed",
 };
 
-export const stacks: StackDescription[] = [signalStack, apiStack, turnStack];
+export const stacks: StackDescription[] = [
+  cloudFrontStack,
+  signalStack,
+  // apiStack,
+  turnStack,
+];

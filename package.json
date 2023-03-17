@@ -29,7 +29,8 @@
     "figlet": "^1.5.2",
     "gradient-string": "^2.0.2",
     "inquirer": "^9.1.4",
-    "ora": "^6.1.2"
+    "ora": "^6.1.2",
+    "yaml-cfn": "^0.3.2"
   },
   "devDependencies": {
     "@aws-sdk/types": "^3.289.0",

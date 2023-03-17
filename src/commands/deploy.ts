@@ -7,15 +7,17 @@ import {
   apiStack,
   signalStack,
   turnStack,
+  cloudFrontStack,
 } from "../utils/stackDescriptions.js";
 import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
 import { deployErrorHandler } from "../utils/errorHandler.js";
+import { modifyApiYaml } from "../utils/yaml.js";
 
 const aws = new AwsServices();
 
 // deploy stack helper function
-const deployStack = async (stack: StackDescription) => {
+const deployStack = async (stack: StackDescription): Promise<boolean> => {
   let spinner = ui.spinner(stack.initiateMessage);
   const stackId = await aws
     .provisionResources(stack.name, stack.template)
@@ -29,6 +31,11 @@ const deployStack = async (stack: StackDescription) => {
     .checkStackCreationStatus(stack.name)
     .catch((err) => deployErrorHandler(err, spinner));
   spinner.succeed(ui.secondary(stack.deployCompleteMessage));
+  return Promise.resolve(true);
+};
+
+const awaitPromises = async (promises: Promise<boolean>[]) => {
+  await Promise.all(promises);
 };
 
 // main `deploy` command logic
@@ -44,13 +51,34 @@ export class Deploy extends Command {
 
     ui.display("\n🦦 Otter is being deployed and might take a few minutes\n");
 
-    // deploy stacks
+    // deploy CF stack
+    // await deployStack(cloudFrontStack);
+    let stackPromises: Promise<boolean>[] = [];
     for (let stack of stacks) {
-      await deployStack(stack);
+      stackPromises.push(deployStack(stack));
     }
 
+    await awaitPromises(stackPromises);
+
+    let spinner = ui.spinner("Getting your CloudFront domain...");
+    const cloudFrontDomain = await aws
+      .getApiEndpoint(cloudFrontStack.name)
+      .catch((err) => deployErrorHandler(err, spinner));
+
+    modifyApiYaml(cloudFrontDomain); // modify YAML to embed CF domain in Lambda code
+    spinner.succeed(ui.secondary("Domain acquired"));
+
+    await deployStack(apiStack);
+
+    // // deploy other stacks
+    // for (let stack of stacks) {
+    //   await deployStack(stack);
+    // }
+
+    // setup ECS
+
     // retrieve API endpoint
-    let spinner = ui.spinner("Gathering your resource information...");
+    spinner = ui.spinner("Gathering your resource information...");
     const apiEndpoint = await aws
       .getApiEndpoint(apiStack.name)
       .catch((err) => deployErrorHandler(err, spinner));
