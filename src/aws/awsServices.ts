@@ -37,7 +37,7 @@ export class AwsServices implements InterfaceAwsServices {
     const params = {
       StackName: stackName,
       TemplateBody: fs.readFileSync(path.join(__dirname, template), "utf8"),
-      Capabilities: ["CAPABILITY_IAM"],
+      Capabilities: ["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"],
     };
 
     const result = await this.cloudFormationClient
