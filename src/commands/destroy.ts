@@ -5,7 +5,6 @@ import { AwsServices } from "../aws/awsServices.js";
 import { config } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
 import { errorHandler } from "../utils/errorHandler.js";
-import { modifyApiYaml } from "../utils/yaml.js";
 
 const createdStacks = config.get("createdStacks") as string[];
 const aws = new AwsServices();
