@@ -58,31 +58,6 @@ Resources:
     Properties:
       Code:
         ZipFile: |-
-<<<<<<< HEAD
-          const AWS = require('aws-sdk');
-                const ddb = new AWS.DynamoDB.DocumentClient();
-                exports.handler = async function (event, context) {
-                  try {
-                    await ddb
-                      .put({
-                        TableName: process.env.table,
-                        Item: {
-                          connectionId: event.requestContext.connectionId,
-                        },
-                      })
-                      .promise();
-                  } catch (err) {
-                    return {
-                      statusCode: 500,
-                    };
-                  }
-                  return {
-                    statusCode: 200,
-                  };
-                };
-      Role: !GetAtt
-        - ConnectHandlerServiceRole2301
-=======
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const {
             DynamoDBDocumentClient,
@@ -193,23 +168,15 @@ Resources:
           };
       Role: !GetAtt
         - MessageHandlerServiceRole2301
->>>>>>> be3aa750af21291cc6496b64c274a65e4ecb6546
         - Arn
       Environment:
         Variables:
           table: !Ref ConnectionsTable2301
       Handler: index.handler
-<<<<<<< HEAD
-      Runtime: nodejs14.x
-    DependsOn:
-      - ConnectHandlerServiceRoleDefaultPolicy2301
-      - ConnectHandlerServiceRole2301
-=======
       Runtime: nodejs18.x
     DependsOn:
       - MessageHandlerServiceRoleDefaultPolicy2301
       - MessageHandlerServiceRole2301
->>>>>>> be3aa750af21291cc6496b64c274a65e4ecb6546
   DisconnectHandlerServiceRole2301:
     Type: "AWS::IAM::Role"
     Properties:
@@ -395,10 +362,6 @@ Resources:
           const {
             DynamoDBDocumentClient,
             ScanCommand,
-<<<<<<< HEAD
-            PutCommand,
-=======
->>>>>>> be3aa750af21291cc6496b64c274a65e4ecb6546
           } = require("@aws-sdk/lib-dynamodb");
 
           const {
@@ -424,11 +387,7 @@ Resources:
             });
           };
 
-<<<<<<< HEAD
-          exports.handler = async function (event) {
-=======
           exports.handler = async function (event, context) {
->>>>>>> be3aa750af21291cc6496b64c274a65e4ecb6546
             console.log("Lambda is invoked!");
             let connections;
             try {
@@ -452,109 +411,6 @@ Resources:
 
             const message = JSON.parse(event.body).message;
 
-<<<<<<< HEAD
-            if (message.type === "joinOrCreate") {
-              const source = event.requestContext.connectionId;
-              const destination = message.payload;
-              console.log("source and destination", source, destination);
-
-              const targetItem = connections.Items.filter(
-                ({ roomId }) => roomId === destination
-              )[0]; // find row where roomId exists
-
-              console.log("line 42 targetItem", targetItem);
-              const targetConnectionId = targetItem && targetItem.connectionId;
-
-              try {
-                await dynamo.send(
-                  new PutCommand({
-                    TableName: TABLE_NAME,
-                    Item: {
-                      connectionId: source,
-                      roomId: destination,
-                    },
-                  })
-                );
-                console.log("Room was joined by ", source);
-              } catch (err) {
-                return {
-                  statusCode: 500,
-                };
-              }
-
-              // if peer in room exists
-              if (targetConnectionId) {
-                const messageToSelf = {
-                  type: "roomId",
-                  payload: targetConnectionId,
-                };
-                await callbackAPI.send(constructResponseCommand(source, messageToSelf));
-                console.log("sent out my Peer Id to myself line 74");
-
-                const messageToPeer = {
-                  type: "startConnection",
-                  payload: source,
-                };
-
-                console.log(messageToPeer);
-
-                try {
-                  await callbackAPI.send(
-                    constructResponseCommand(targetConnectionId, messageToPeer)
-                  );
-                  console.log("sent out message to the other peer line 90");
-                } catch (E) {
-                  console.log(E);
-                }
-              }
-            } else {
-              if (message.type === "endConnection") {
-                console.log("endConnection -- message payload: ", message.payload);
-                const targetItem = connections.Items.filter(
-                  ({ roomId }) => roomId === message.payload
-                )[0]; // find row where roomId exists
-
-                console.log("targetItem:", targetItem);
-                const targetConnectionId = targetItem && targetItem.connectionId;
-                if (targetConnectionId) {
-                  await callbackAPI.send(
-                    constructResponseCommand(targetConnectionId, message)
-                  );
-                  console.log("sent out message to the other peer line 120");
-                }
-                return { statusCode: 200 };
-              }
-
-              const source = event.requestContext.connectionId;
-              const targetItem = connections.Items.filter(
-                ({ connectionId }) => connectionId === source
-              )[0];
-
-              const room = targetItem.roomId;
-
-              if (!room) {
-                console.log("Not in a room!", targetItem, source);
-                return { statusCode: 200 };
-              }
-
-              console.log("found room, now finding peer", room);
-
-              let targetConnectionId = connections.Items.filter(
-                ({ connectionId, roomId }) => roomId === room && connectionId !== source
-              )[0];
-
-              targetConnectionId = targetConnectionId && targetConnectionId.connectionId;
-
-              console.log("found targetConnectionId", targetConnectionId);
-
-              if (targetConnectionId) {
-                await callbackAPI.send(
-                  constructResponseCommand(targetConnectionId, message)
-                );
-                console.log("sent out message to the other peer");
-              }
-            }
-=======
             console.log(event, context);
 
             const source = event.requestContext.connectionId;
@@ -606,7 +462,6 @@ Resources:
               }
             }
 
->>>>>>> be3aa750af21291cc6496b64c274a65e4ecb6546
             return { statusCode: 200 };
           };
       Role: !GetAtt

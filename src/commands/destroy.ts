@@ -5,17 +5,9 @@ import { AwsServices } from "../aws/awsServices.js";
 import { config } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
 import { errorHandler } from "../utils/errorHandler.js";
-<<<<<<< HEAD
-import { modifyApiYaml } from "../utils/yaml.js";
-=======
->>>>>>> be3aa750af21291cc6496b64c274a65e4ecb6546
 
 const createdStacks = config.get("createdStacks") as string[];
 const aws = new AwsServices();
-
-const destroyStack = async (stack: string) => {
-
-}
 
 // main `destroy` command logic
 export class Destroy extends Command {
@@ -64,7 +56,12 @@ export class Destroy extends Command {
 
     // remove stack info from config
     spinner = ui.spinner("Final cleanup");
-    config.set({ createdStacks: [], apiEndpoint: "", webSocketEndpoint: "", loadBalancerEndpoint: "" });
+    config.set({
+      createdStacks: [],
+      apiEndpoint: "",
+      webSocketEndpoint: "",
+      loadBalancerEndpoint: "",
+    });
     spinner.succeed(ui.secondary("Final cleanup"));
 
     ui.success("\nTeardown completed successfully. Bye! 👋");
