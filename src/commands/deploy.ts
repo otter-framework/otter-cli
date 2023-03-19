@@ -13,6 +13,7 @@ import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
 import { deployErrorHandler } from "../utils/errorHandler.js";
 import { modifyApiYaml } from "../utils/yaml.js";
+import { writeFile } from "../utils/writeFile.js";
 import Listr from "listr";
 
 let aws: AwsServices;
@@ -110,7 +111,7 @@ const tasks = new Listr([
       const APIEndpoint = config.get("apiEndpoint") as string;
 
       // Generate Config file
-      await aws.writeFile(
+      await writeFile(
         ELBEndpoint,
         "1679249183-:-DefaultName",
         "e5QpXrS9wtJsxGcSzRhZeI0QngE=",

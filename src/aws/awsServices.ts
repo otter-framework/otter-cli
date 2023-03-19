@@ -137,44 +137,6 @@ export class AwsServices implements InterfaceAwsServices {
     return endpoint;
   }
 
-  async writeFile(
-    turnEndpt: string,
-    userName: string,
-    credential: string,
-    wsEndpt: string,
-    RESTEndpt: string
-  ): Promise<void> {
-    return new Promise((res, _) => {
-      const content = `export const RTCConfig = {
-        iceServers: [
-          {
-            urls: [
-              "turn:${turnEndpt}:80",
-            ],
-            username: "${userName}",
-            credential: "${credential}",
-          },
-        ],
-        iceCandidatePoolSize: 10,
-      };
-      
-    export const WebSocketEndpoint = "${wsEndpt}";
-    export const RESTAPIEndpoint = "${RESTEndpt}";`;
-      try {
-        fs.writeFile("configs.js", content, (err) => {
-          if (err) {
-            console.error(err);
-          } else {
-            res();
-            // file written successfully
-          }
-        });
-      } catch (err) {
-        console.log(err);
-      }
-    });
-  }
-
   async uploadFile(): Promise<void> {
     // Set the bucket and file name
     const bucketName = await this.getConfigBucketName();
