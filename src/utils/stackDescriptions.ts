@@ -13,7 +13,7 @@ export const cloudFrontStack: StackDescription = {
   initiateMessage: "Initiating CloudFront Stack deployment",
   initiateCompleteMessage: "CloudFront Stack deployment initiated",
   deployingMessage: "Deploying CloudFront Stack",
-  deployCompleteMessage: "CloudFront Stack deployed",
+  deployCompleteMessage: "CloudFront Stack is deployed.",
 };
 
 export const signalStack: StackDescription = {
@@ -22,7 +22,7 @@ export const signalStack: StackDescription = {
   initiateMessage: "Initiating Signaling Services deployment",
   initiateCompleteMessage: "Signaling Services deployment initiated",
   deployingMessage: "Deploying Otter Signaling Services",
-  deployCompleteMessage: "Otter Signaling Services deployed",
+  deployCompleteMessage: "Otter Signaling Services is ready.",
 };
 
 export const apiStack: StackDescription = {
@@ -31,7 +31,7 @@ export const apiStack: StackDescription = {
   initiateMessage: "Initiating API Services deployment",
   initiateCompleteMessage: "API Services deployment initiated",
   deployingMessage: "Deploying Otter API Services",
-  deployCompleteMessage: "Otter API Services deployed",
+  deployCompleteMessage: "Otter API Services is ready.",
 };
 
 export const turnStack: StackDescription = {
@@ -40,7 +40,16 @@ export const turnStack: StackDescription = {
   initiateMessage: "Initiating STUN/TURN cluster deployment",
   initiateCompleteMessage: "STUN/TURN cluster deployment initiated",
   deployingMessage: "Deploying Otter STUN/TURN cluster",
-  deployCompleteMessage: "Otter STUN/TURN cluster deployed",
+  deployCompleteMessage: "Otter STUN/TURN cluster is ready.",
+};
+
+export const ec2Stack: StackDescription = {
+  name: "EC2Stack",
+  template: "/templates/ec2.yaml",
+  initiateMessage: "Initiating EC2 deployment",
+  initiateCompleteMessage: "EC2 deployment initiated",
+  deployingMessage: "Deploying Otter EC2",
+  deployCompleteMessage: "Otter EC2 is ready.",
 };
 
 export const stacks: StackDescription[] = [

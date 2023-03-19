@@ -7,6 +7,7 @@ import {
   signalStack,
   turnStack,
   cloudFrontStack,
+  ec2Stack,
 } from "../utils/stackDescriptions.js";
 import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
@@ -14,7 +15,7 @@ import { deployErrorHandler } from "../utils/errorHandler.js";
 import { modifyApiYaml } from "../utils/yaml.js";
 import Listr from "listr";
 
-const aws = new AwsServices();
+let aws: AwsServices;
 
 // deploy stack helper function
 const deployStack = async (stack: StackDescription): Promise<boolean> => {
@@ -57,6 +58,13 @@ const concurrentTasks = new Listr(
         task.title = ui.secondary(cloudFrontStack.deployCompleteMessage);
       },
     },
+    {
+      title: ec2Stack.deployingMessage,
+      task: async (_, task) => {
+        await deployStack(ec2Stack);
+        task.title = ui.secondary(ec2Stack.deployCompleteMessage);
+      },
+    },
   ],
   { concurrent: true }
 );
@@ -67,7 +75,7 @@ const tasks = new Listr([
     task: () => concurrentTasks,
   },
   {
-    title: ui.secondary("Getting Otter-meet domain"),
+    title: ui.secondary("Prepare Otter-meet domain"),
     task: async (_, task) => {
       task.title = "Getting Otter-meet domain";
       const cloudFrontDomain = await aws
@@ -75,7 +83,7 @@ const tasks = new Listr([
         .catch((err) => deployErrorHandler(err));
 
       modifyApiYaml(cloudFrontDomain); // modify YAML to embed CF domain in Lambda code
-      task.title = ui.secondary("Otter-meet domain ready");
+      task.title = "Otter-meet domain is ready.";
     },
   },
   {
@@ -83,13 +91,45 @@ const tasks = new Listr([
     task: async (_, task) => {
       task.title = apiStack.deployingMessage;
       await deployStack(apiStack);
-      task.title = ui.secondary(apiStack.deployCompleteMessage);
+      task.title = apiStack.deployCompleteMessage;
     },
   },
   {
-    title: ui.secondary("Gathering your resource information..."),
+    title: ui.secondary("Create Otter-meet Application"),
     task: async (_, task) => {
-      task.title = "Gathering your resource information...";
+      task.title = "Creating and serving Otter-meet App";
+
+      // Get EC2 instance ID from ec2 cloudformation template output
+      const EC2InstanceId = await aws
+        .getApiEndpoint(ec2Stack.name)
+        .catch((err) => deployErrorHandler(err));
+
+      // Get endpoints for writing config file
+      const ELBEndpoint = config.get("loadBalancerEndpoint") as string;
+      const WSEndpoint = config.get("webSocketEndpoint") as string;
+      const APIEndpoint = config.get("apiEndpoint") as string;
+
+      // Generate Config file
+      await aws.writeFile(
+        ELBEndpoint,
+        "1679249183-:-DefaultName",
+        "e5QpXrS9wtJsxGcSzRhZeI0QngE=",
+        WSEndpoint,
+        APIEndpoint
+      );
+
+      // Upload config file to Config s3 bucket
+      await aws.uploadFile();
+      // Send commands to EC2 to build react app
+      await aws.sendEC2Commands(EC2InstanceId);
+      // await aws.destroyResources(ec2Stack.name);
+      task.title = "Otter-meet App is ready.";
+    },
+  },
+  {
+    title: ui.secondary("Gather resource information"),
+    task: async (_, task) => {
+      task.title = "Gather resource information";
       const apiEndpoint = await aws
         .getApiEndpoint(apiStack.name)
         .catch((err) => deployErrorHandler(err));
@@ -102,7 +142,7 @@ const tasks = new Listr([
         .getApiEndpoint(turnStack.name)
         .catch((err) => deployErrorHandler(err));
       config.set({ loadBalancerEndpoint });
-      task.title = ui.secondary("Resource information acquired");
+      task.title = "Resource information acquired";
     },
   },
 ]);
@@ -116,7 +156,7 @@ export class Deploy extends Command {
     ui.generateLogo();
 
     const { credentials, region } = await GetAwsInfo();
-    aws.setupClients(credentials, region);
+    aws = new AwsServices(credentials, region);
 
     ui.display("\n🦦 Otter is being deployed and might take a few minutes\n");
 
