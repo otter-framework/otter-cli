@@ -128,13 +128,7 @@ const tasks = new Listr([
       const APIEndpoint = config.get("apiEndpoint") as string;
 
       // Generate Config file
-      await writeFile(
-        ELBEndpoint,
-        "1679249183-:-DefaultName",
-        "e5QpXrS9wtJsxGcSzRhZeI0QngE=",
-        WSEndpoint,
-        APIEndpoint
-      );
+      await writeFile(ELBEndpoint, WSEndpoint, APIEndpoint);
 
       // Upload config file to Config s3 bucket
       await aws.uploadFile();
