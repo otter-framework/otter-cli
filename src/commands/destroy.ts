@@ -7,7 +7,6 @@ import * as ui from "../utils/ui.js";
 import { errorHandler } from "../utils/errorHandler.js";
 
 const createdStacks = config.get("createdStacks") as string[];
-const aws = new AwsServices();
 
 // main `destroy` command logic
 export class Destroy extends Command {
@@ -18,7 +17,7 @@ export class Destroy extends Command {
 
     // make sure all AWS info exists
     const { credentials, region } = await GetAwsInfo();
-    aws.setupClients(credentials, region);
+    const aws = new AwsServices(credentials, region);
 
     const { confirmDestroy } = await DestroyPrompt();
 
@@ -52,11 +51,16 @@ export class Destroy extends Command {
         .checkStackDeletionStatus(currentStack)
         .catch((err) => errorHandler(err, spinner));
     }
-    spinner.succeed(ui.secondary("Otter infrastructure teardown complete"));
+    spinner.succeed(ui.secondary("Otter teardown complete"));
 
     // remove stack info from config
     spinner = ui.spinner("Final cleanup");
-    config.set({ createdStacks: [] });
+    config.set({
+      createdStacks: [],
+      apiEndpoint: "",
+      webSocketEndpoint: "",
+      loadBalancerEndpoint: "",
+    });
     spinner.succeed(ui.secondary("Final cleanup"));
 
     ui.success("\nTeardown completed successfully. Bye! 👋");

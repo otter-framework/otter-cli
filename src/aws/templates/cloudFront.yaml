@@ -1,0 +1,120 @@
+Resources:
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Delete"
+    Properties:
+      # BucketName: react-app-bucket2301
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+  S3ConfigBucket:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Delete"
+    Properties:
+      # BucketName: config-file-bucket2301
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+      AccessControl: PublicRead
+
+  S3BucketRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: S3BucketRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/"
+
+  S3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - "s3:GetObject"
+              - "s3:PutObject"
+            Resource: !Join
+              - ""
+              - - "arn:aws:s3:::"
+                - !Ref S3Bucket
+                - /*
+
+  S3ConfigBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref S3ConfigBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - "s3:GetObject"
+            Resource: !Join
+              - ""
+              - - "arn:aws:s3:::"
+                - !Ref S3ConfigBucket
+                - /*
+
+  S3BucketRolePolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: S3BucketRolePolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "s3:GetObject"
+              - "s3:PutObject"
+            Resource: !Join
+              - ""
+              - - "arn:aws:s3:::"
+                - !Ref S3Bucket
+                - /*
+      Roles:
+        - !Ref S3BucketRole
+
+  CloudFrontDistribution:
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        DefaultRootObject: "index.html"
+        Enabled: true
+        HttpVersion: "http2"
+        Origins:
+          - DomainName: !GetAtt S3Bucket.DomainName
+            Id: "S3Origin"
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          ForwardedValues:
+            Cookies:
+              Forward: "none"
+            QueryString: false
+          MinTTL: 0
+          TargetOriginId: "S3Origin"
+          ViewerProtocolPolicy: "redirect-to-https"
+        PriceClass: "PriceClass_All"
+
+Outputs:
+  CloudFrontDomainName:
+    Value: !Join ["", ["https://", !GetAtt CloudFrontDistribution.DomainName]]
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudFrontDomainName"

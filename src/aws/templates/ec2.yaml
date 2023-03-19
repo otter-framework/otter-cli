@@ -1,0 +1,58 @@
+Mappings:
+  RegionMap:
+    us-east-2:
+      "Image": "ami-00eeedc4036573771"
+    us-west-1:
+      "Image": "ami-0d50e5e845c552faf"
+
+Resources:
+  MyEC2Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: EC2-role-for-cloudfront-2301
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+
+  EC2InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: EC2-role-for-cloudfront-2301
+      Roles:
+        - !Ref MyEC2Role
+
+  EC2ForReactFrontend2301:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", Image]
+      InstanceType: t2.micro
+      KeyName: !Ref MyKeyPair2301
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup2301
+
+  EC2SecurityGroup2301:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Security group for EC2 instance"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  MyKeyPair2301:
+    Type: "AWS::EC2::KeyPair"
+    Properties:
+      KeyName: keyForEC2-2301
+
+Outputs:
+  InstanceId:
+    Value: !Ref EC2ForReactFrontend2301
