@@ -12,8 +12,8 @@ export const writeFile = async (
           urls: [
             "turn:${turnEndpt}:80",
           ],
-          username: null,
-          credential: null,
+          username: "1679341410-:-DefaultName",
+          credential: "9iNiJKJIpVC293f715Jf0+RdcMg=",
         },
       ],
       iceCandidatePoolSize: 10,
