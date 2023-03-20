@@ -1,6 +1,6 @@
 {
   "name": "otter-video-cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Deploy and Manage Otter Infrastructures",
   "author": "otter-framework",
   "bin": {
