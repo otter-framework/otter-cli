@@ -314,7 +314,7 @@ Resources:
             - '--external-ip="$(detect-external-ip)"'
             - "--listening-port=80"
             - "--min-port=49152"
-            - "--max-port=49227"
+            - "--max-port=49180"
             - "--use-auth-secret"
             - "--static-auth-secret=OTTER-WebRTC-2023"
             - "--fingerprint"
@@ -336,7 +336,7 @@ Resources:
           PortMappings:
             - ContainerPort: 80
               HostPort: 80
-              Protocol: tcp
+              Protocol: udp
             - ContainerPort: 49152
               HostPort: 49152
               Protocol: udp

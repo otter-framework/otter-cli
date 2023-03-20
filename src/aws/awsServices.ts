@@ -22,6 +22,13 @@ import {
   ObjectIdentifier,
   DeleteObjectsCommandInput,
 } from "@aws-sdk/client-s3";
+import {
+  CloudFrontClient,
+  UpdateDistributionCommand,
+  UpdateDistributionCommandInput,
+  ListDistributionsCommand,
+  GetDistributionConfigCommand,
+} from "@aws-sdk/client-cloudfront";
 
 interface InterfaceAwsServices {
   provisionResources: (
@@ -38,6 +45,7 @@ export class AwsServices implements InterfaceAwsServices {
   s3Client: S3;
   ec2Client: EC2;
   ssmClient: SSM;
+  cloudfront: CloudFrontClient;
   checkInterval: number;
 
   constructor(credentials: AwsCredentialIdentity, region: string) {
@@ -45,6 +53,7 @@ export class AwsServices implements InterfaceAwsServices {
     this.s3Client = new S3({ credentials, region });
     this.ec2Client = new EC2({ credentials, region });
     this.ssmClient = new SSM({ credentials, region });
+    this.cloudfront = new CloudFrontClient({ credentials, region });
     this.checkInterval = 3000;
   }
 
@@ -125,7 +134,7 @@ export class AwsServices implements InterfaceAwsServices {
   }
 
   // get API endpoint from stack output
-  async getApiEndpoint(apiStackName: string): Promise<string> {
+  async getEndpoint(apiStackName: string, outputKey: string): Promise<string> {
     const stackDescription = await this.cloudFormationClient
       ?.describeStacks({
         StackName: apiStackName,
@@ -133,9 +142,12 @@ export class AwsServices implements InterfaceAwsServices {
       .catch((err: CloudFormationServiceException) =>
         Promise.reject(err.message)
       );
-    const output = stackDescription?.Stacks?.[0].Outputs?.[0];
-    const endpoint = output?.OutputValue;
-    if (!endpoint) throw new Error("Could not find your API endpoint");
+    const outputs = stackDescription?.Stacks?.[0].Outputs;
+    const targetOutput = outputs?.filter(
+      (output) => output.OutputKey === outputKey
+    )[0];
+    const endpoint = targetOutput?.OutputValue;
+    if (!endpoint) throw new Error("Could not find your endpoint");
 
     return endpoint;
   }
@@ -165,9 +177,11 @@ export class AwsServices implements InterfaceAwsServices {
   async getConfigBucketName(): Promise<string> {
     const data = await this.s3Client.send(new ListBucketsCommand({}));
     const buckets = data.Buckets;
+    if (buckets && buckets.length === 0) return "";
     const configBuckets = buckets?.filter((bucket) =>
       bucket.Name?.startsWith("cloudfrontstack-s3configbucket")
     );
+    if (configBuckets && configBuckets.length === 0) return "";
     let target = configBuckets?.[0];
     let newestTime = configBuckets?.[0].CreationDate;
     configBuckets?.forEach((bucket) => {
@@ -182,18 +196,20 @@ export class AwsServices implements InterfaceAwsServices {
 
     if (target?.Name) return target?.Name;
 
-    return Promise.reject("No S3 Config Bucket can be found.");
+    return "";
   }
 
   async getReactBucketName(): Promise<string> {
     const data = await this.s3Client.send(new ListBucketsCommand({}));
     const buckets = data.Buckets;
-    const configBuckets = buckets?.filter((bucket) =>
+    if (buckets && buckets.length === 0) return "";
+    const reactBuckets = buckets?.filter((bucket) =>
       bucket.Name?.startsWith("cloudfrontstack-s3bucket")
     );
-    let target = configBuckets?.[0];
-    let newestTime = configBuckets?.[0].CreationDate;
-    configBuckets?.forEach((bucket) => {
+    if (reactBuckets && reactBuckets.length === 0) return "";
+    let target = reactBuckets?.[0];
+    let newestTime = reactBuckets?.[0].CreationDate;
+    reactBuckets?.forEach((bucket) => {
       if (
         bucket.CreationDate &&
         newestTime &&
@@ -205,12 +221,14 @@ export class AwsServices implements InterfaceAwsServices {
 
     if (target?.Name) return target?.Name;
 
-    return Promise.reject("No S3 Bucket can be found.");
+    return "";
   }
 
   async sendEC2Commands(instanceId: string): Promise<void> {
     const configBucketName = await this.getConfigBucketName();
     const reactBucketName = await this.getReactBucketName();
+    if (!configBucketName || !reactBucketName)
+      return Promise.reject("Missing Bucket name, please try again");
     try {
       const describeParams = {
         InstanceIds: [instanceId],
@@ -282,8 +300,8 @@ export class AwsServices implements InterfaceAwsServices {
   async emptyBuckets() {
     const configBucketName = await this.getConfigBucketName();
     const reactBucketName = await this.getReactBucketName();
-    await this.emptyBucket(configBucketName);
-    await this.emptyBucket(reactBucketName);
+    if (configBucketName) await this.emptyBucket(configBucketName);
+    if (reactBucketName) await this.emptyBucket(reactBucketName);
   }
 
   async emptyBucket(bucket: string) {
@@ -302,10 +320,47 @@ export class AwsServices implements InterfaceAwsServices {
         Bucket: bucket,
         Delete: { Objects: toBeDeleted },
       };
-      const response = await this.s3Client.send(
-        new DeleteObjectsCommand(params)
-      );
+      await this.s3Client.send(new DeleteObjectsCommand(params));
     }
+  }
+
+  async updateCloudFrontDomain(domain: string) {
+    const response = await this.cloudfront.send(
+      new ListDistributionsCommand({})
+    );
+    const id = response.DistributionList?.Items?.[0].Id;
+    console.log("CF id: ", id);
+    const distributionConfigResponse = await this.cloudfront.send(
+      new GetDistributionConfigCommand({ Id: id })
+    );
+    const distributionConfig = distributionConfigResponse.DistributionConfig;
+    const etag = distributionConfigResponse.ETag;
+    console.log("DConfig: ", distributionConfig);
+    const origin = distributionConfig?.Origins?.Items?.[0];
+    console.log("origin: ", origin);
+    if (origin) {
+      origin.DomainName =
+        "cloudfrontstack-s3bucket-1fauf2jcmbv9l.s3-website.us-east-2.amazonaws.com";
+      origin.CustomOriginConfig = {
+        HTTPPort: 80,
+        HTTPSPort: 443,
+        OriginProtocolPolicy: "http-only",
+        OriginSslProtocols: {
+          Quantity: 3,
+          Items: ["TLSv1", "TLSv1.1", "TLSv1.2"],
+        },
+        OriginReadTimeout: 30,
+        OriginKeepaliveTimeout: 5,
+      };
+      delete origin.S3OriginConfig;
+    }
+    console.log("new origin: ", origin);
+    const params: UpdateDistributionCommandInput = {
+      Id: id,
+      DistributionConfig: distributionConfig,
+      IfMatch: etag,
+    };
+    await this.cloudfront.send(new UpdateDistributionCommand(params));
   }
 
   // private methods below
