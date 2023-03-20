@@ -645,7 +645,7 @@ Resources:
               console.log("roomResource: ", roomResource);
               // create the room if it doesn't exist
               if (!roomResource || roomResource.roomId === undefined) {
-                const domain = "https://d32g8w2h7ieex4.cloudfront.net"
+                const domain = "https://d8caf4n9nxjbl.cloudfront.net"
                 roomResource = constructRoomResource(config, domain)
                 await createRoom(roomResource);
               }

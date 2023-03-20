@@ -136,6 +136,7 @@ const tasks = new Listr([
       // Send commands to EC2 to build react app
       await aws.sendEC2Commands(EC2InstanceId);
       await aws.destroyResources(ec2Stack.name);
+      await aws.deleteS3ConfigBucket();
       task.title = "Otter-meet App is ready.";
     },
   },
@@ -154,9 +155,9 @@ export class Deploy extends Command {
 
     ui.display("\n🦦 Otter is being deployed and might take a few minutes\n");
 
-    await tasks.run();
+    await tasks.run(); 
 
-    apiKey = generateApiKey();
+    apiKey = generateApiKey(); 
 
     // summary and goodbye
     ui.printOtter();

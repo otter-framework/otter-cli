@@ -224,6 +224,23 @@ export class AwsServices implements InterfaceAwsServices {
     return "";
   }
 
+  async deleteS3ConfigBucket(): Promise<void> {
+    const bucketName = await this.getConfigBucketName();
+  
+    // Delete all objects within the bucket
+    const objects = await this.s3Client.listObjectsV2({ Bucket: bucketName });
+    if (objects.Contents) {
+      const deleteParams = {
+        Bucket: bucketName,
+        Delete: { Objects: objects.Contents.map(({ Key }) => ({ Key })) },
+      };
+      await this.s3Client.deleteObjects(deleteParams);
+    }
+  
+    // Delete the bucket
+    await this.s3Client.deleteBucket({ Bucket: bucketName });
+  }
+
   async sendEC2Commands(instanceId: string): Promise<void> {
     const configBucketName = await this.getConfigBucketName();
     const reactBucketName = await this.getReactBucketName();
