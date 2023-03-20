@@ -39,6 +39,10 @@ const destroy = async () => {
   const concurrentTask = new Listr(concurrentTaskList, { concurrent: true });
   const allTasks = new Listr([
     {
+      title: "Prepare for the teardown",
+      task: async () => await aws.emptyBuckets(),
+    },
+    {
       title: "Teardown Otter Infrastructure",
       task: () => concurrentTask,
     },

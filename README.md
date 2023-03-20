@@ -30,7 +30,7 @@ $ npm install -g otter-video-cli
 $ otter COMMAND
 running command...
 $ otter (--version)
-otter-video-cli/0.2.0 darwin-x64 node-v19.5.0
+otter-video-cli/0.3.0 darwin-x64 node-v19.5.0
 $ otter --help [COMMAND]
 USAGE
   $ otter COMMAND
@@ -43,6 +43,7 @@ USAGE
 <!-- commands -->
 * [`otter deploy`](#otter-deploy)
 * [`otter destroy`](#otter-destroy)
+* [`otter dev`](#otter-dev)
 * [`otter help [COMMANDS]`](#otter-help-commands)
 
 ## `otter deploy`
@@ -57,7 +58,7 @@ DESCRIPTION
   deploy otter aws infrastructure
 ```
 
-_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.2.0/dist/commands/deploy.ts)_
+_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.3.0/dist/commands/deploy.ts)_
 
 ## `otter destroy`
 
@@ -71,7 +72,21 @@ DESCRIPTION
   destroy otter aws infrastructure
 ```
 
-_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.2.0/dist/commands/destroy.ts)_
+_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.3.0/dist/commands/destroy.ts)_
+
+## `otter dev`
+
+why are you here?
+
+```
+USAGE
+  $ otter dev
+
+DESCRIPTION
+  why are you here?
+```
+
+_See code: [dist/commands/dev.ts](https://github.com/otter-framework/otter-cli/blob/v0.3.0/dist/commands/dev.ts)_
 
 ## `otter help [COMMANDS]`
 

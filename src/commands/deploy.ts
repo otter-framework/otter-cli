@@ -15,6 +15,7 @@ import { deployErrorHandler } from "../utils/errorHandler.js";
 import { modifyApiYaml } from "../utils/yaml.js";
 import { writeFile } from "../utils/writeFile.js";
 import { generateApiKey } from "../utils/generateApiKey.js";
+import { getSampleRoomUrl } from "../utils/sampleRoom.js";
 import Listr from "listr";
 
 let aws: AwsServices;
@@ -172,6 +173,11 @@ export class Deploy extends Command {
     );
     ui.display(`- Your Otter configuration file: ${ui.highlight(config.path)}`);
     ui.display(`- Your API Key: ${ui.highlight(apiKey)}`);
+    ui.display(
+      `\nWe've also created a sample room for you to test. Open the browser then go to ${ui.highlight(
+        await getSampleRoomUrl()
+      )}. Enjoy!`
+    );
 
     ui.display("\nThank you for using Otter, see you next time! 👋");
   }

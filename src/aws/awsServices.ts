@@ -17,7 +17,10 @@ import {
   S3,
   PutObjectCommand,
   ListBucketsCommand,
-  Bucket,
+  ListObjectsCommand,
+  DeleteObjectsCommand,
+  ObjectIdentifier,
+  DeleteObjectsCommandInput,
 } from "@aws-sdk/client-s3";
 
 interface InterfaceAwsServices {
@@ -245,10 +248,6 @@ export class AwsServices implements InterfaceAwsServices {
         Parameters: {
           commands: commands,
         },
-        // CloudWatchOutputConfig: {
-        //   CloudWatchLogGroupName: "/aws/apigateway/w6b8pndngh/dev",
-        //   CloudWatchOutputEnabled: true,
-        // },
       };
 
       const sentCommand = await this.ssmClient.sendCommand(sendCommandParams);
@@ -278,6 +277,35 @@ export class AwsServices implements InterfaceAwsServices {
         }
       }, this.checkInterval);
     });
+  }
+
+  async emptyBuckets() {
+    const configBucketName = await this.getConfigBucketName();
+    const reactBucketName = await this.getReactBucketName();
+    await this.emptyBucket(configBucketName);
+    await this.emptyBucket(reactBucketName);
+  }
+
+  async emptyBucket(bucket: string) {
+    const response = await this.s3Client.send(
+      new ListObjectsCommand({ Bucket: bucket })
+    );
+    const objects = response.Contents;
+    if (objects && objects?.length > 0) {
+      let toBeDeleted: ObjectIdentifier[] = [];
+      for (let obj of objects) {
+        toBeDeleted.push({
+          Key: obj.Key,
+        });
+      }
+      const params: DeleteObjectsCommandInput = {
+        Bucket: bucket,
+        Delete: { Objects: toBeDeleted },
+      };
+      const response = await this.s3Client.send(
+        new DeleteObjectsCommand(params)
+      );
+    }
   }
 
   // private methods below
