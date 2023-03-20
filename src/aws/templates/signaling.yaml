@@ -233,7 +233,9 @@ Resources:
           const AWS = require("aws-sdk");
           const ddb = new AWS.DynamoDB.DocumentClient();
           exports.handler = async function (event, context) {
+            console.log(event, context);
             const source = event.requestContext.connectionId;
+
             // set up connections object so we can scan the table
             console.log("before setting up connection to table");
             let connections;
@@ -245,12 +247,13 @@ Resources:
                 statusCode: 500,
               };
             }
+
             // before we delete...grab the room we are in (if we are in one)
             const row = connections.Items.filter(
               ({ connectionId }) => connectionId === source
             )[0]; // find row where roomId exists
 
-            console.log("line 19 row", row);
+            console.log("line 24 row", row);
             const myRoomId = row && row.roomId;
 
             if (myRoomId) {
@@ -258,7 +261,7 @@ Resources:
               const row = connections.Items.filter(
                 ({ roomId, connectionId }) =>
                   roomId === myRoomId && connectionId !== source // make sure we are not sending to ourself
-              )[0]; // find row where roomId exists
+              )[0];
               const targetConnectionId = row && row.connectionId;
               console.log("inside room, targetConnection in row", row);
               if (targetConnectionId) {
@@ -267,12 +270,19 @@ Resources:
                   endpoint:
                     event.requestContext.domainName + "/" + event.requestContext.stage,
                 });
-                await callbackAPI
-                  .postToConnection({
-                    ConnectionId: targetConnectionId,
-                    Data: JSON.stringify({ type: "endConnection" }),
-                  })
-                  .promise();
+                try {
+                  await callbackAPI
+                    .postToConnection({
+                      ConnectionId: targetConnectionId,
+                      Data: JSON.stringify({
+                        source: null,
+                        destination: targetConnectionId,
+                      }),
+                    })
+                    .promise();
+                } catch (e) {
+                  console.log("Error in posting callback endconnection to peer", e);
+                }
               }
             }
 
@@ -289,6 +299,7 @@ Resources:
               statusCode: 200,
             };
           };
+
       Role: !GetAtt
         - DisconnectHandlerServiceRole2301
         - Arn

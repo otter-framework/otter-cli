@@ -22,7 +22,7 @@ export const signalStack: StackDescription = {
   initiateMessage: "Initiating Signaling Services deployment",
   initiateCompleteMessage: "Signaling Services deployment initiated",
   deployingMessage: "Deploying Otter Signaling Services",
-  deployCompleteMessage: "Otter Signaling Services is ready.",
+  deployCompleteMessage: "Otter Signaling Service is ready.",
 };
 
 export const apiStack: StackDescription = {
@@ -30,8 +30,8 @@ export const apiStack: StackDescription = {
   template: "/templates/httpAPI.yaml",
   initiateMessage: "Initiating API Services deployment",
   initiateCompleteMessage: "API Services deployment initiated",
-  deployingMessage: "Deploying Otter API Services",
-  deployCompleteMessage: "Otter API Services is ready.",
+  deployingMessage: "Deploy Otter API Service",
+  deployCompleteMessage: "Otter API Service is ready.",
 };
 
 export const turnStack: StackDescription = {

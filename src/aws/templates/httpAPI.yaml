@@ -569,7 +569,7 @@ Resources:
             const roomId = generateRoomId();
             const now = new Date();
             const utc = now.toUTCString();
-            const url = domainUrl + '/otter-meet/' + roomId
+            const url = domainUrl + '/otter-meet/' + (config.uniqueName || roomId)
             const roomResource = {
               roomId,
               unique_name: config.uniqueName || "",
@@ -645,7 +645,7 @@ Resources:
               console.log("roomResource: ", roomResource);
               // create the room if it doesn't exist
               if (!roomResource || roomResource.roomId === undefined) {
-                const domain = "https://d2iocl4k2o58c6.cloudfront.net"
+                const domain = "https://d32g8w2h7ieex4.cloudfront.net"
                 roomResource = constructRoomResource(config, domain)
                 await createRoom(roomResource);
               }

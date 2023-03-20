@@ -1,10 +1,10 @@
 import { Command } from "@oclif/core";
-import { generateApiKey } from "../utils/generateApiKey.js";
+import { getSampleRoomUrl } from "../utils/sampleRoom.js";
 
 export class Dev extends Command {
   static description = "why are you here?";
 
   async run(): Promise<void> {
-    generateApiKey();
+    await getSampleRoomUrl();
   }
 }

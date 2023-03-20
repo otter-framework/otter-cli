@@ -2,8 +2,6 @@ import * as fs from "fs";
 
 export const writeFile = async (
   turnEndpt: string,
-  userName: string,
-  credential: string,
   wsEndpt: string,
   RESTEndpt: string
 ): Promise<void> => {
@@ -14,8 +12,8 @@ export const writeFile = async (
           urls: [
             "turn:${turnEndpt}:80",
           ],
-          username: "${userName}",
-          credential: "${credential}",
+          username: "1679341410-:-DefaultName",
+          credential: "9iNiJKJIpVC293f715Jf0+RdcMg=",
         },
       ],
       iceCandidatePoolSize: 10,

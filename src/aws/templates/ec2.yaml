@@ -1,9 +1,13 @@
 Mappings:
   RegionMap:
+    us-east-1:
+      "Image": "ami-0557a15b87f6559cf"
     us-east-2:
       "Image": "ami-00eeedc4036573771"
     us-west-1:
       "Image": "ami-0d50e5e845c552faf"
+    us-west-2:
+      "Image": "ami-0735c191cf914754d"
 
 Resources:
   MyEC2Role:

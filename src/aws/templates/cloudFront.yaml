@@ -99,19 +99,35 @@ Resources:
         Enabled: true
         HttpVersion: "http2"
         Origins:
-          - DomainName: !GetAtt S3Bucket.DomainName
-            Id: "S3Origin"
-            S3OriginConfig:
-              OriginAccessIdentity: ""
+          - DomainName: !Join
+              - ""
+              - - !Ref S3Bucket
+                - ".s3-website."
+                - !Ref AWS::Region
+                - ".amazonaws.com"
+            Id: "S3Website"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginKeepaliveTimeout: 5
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 30
         DefaultCacheBehavior:
           ForwardedValues:
             Cookies:
               Forward: "none"
             QueryString: false
           MinTTL: 0
-          TargetOriginId: "S3Origin"
+          TargetOriginId: "S3Website"
           ViewerProtocolPolicy: "redirect-to-https"
         PriceClass: "PriceClass_All"
+        CustomErrorResponses:
+          - ErrorCode: "404"
+            ResponsePagePath: "/index.html"
+            ResponseCode: "200"
+          - ErrorCode: "403"
+            ResponsePagePath: "/index.html"
+            ResponseCode: "200"
 
 Outputs:
   CloudFrontDomainName:

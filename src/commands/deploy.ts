@@ -14,25 +14,24 @@ import * as ui from "../utils/ui.js";
 import { deployErrorHandler } from "../utils/errorHandler.js";
 import { modifyApiYaml } from "../utils/yaml.js";
 import { writeFile } from "../utils/writeFile.js";
+import { generateApiKey } from "../utils/generateApiKey.js";
+import { getSampleRoomUrl } from "../utils/sampleRoom.js";
 import Listr from "listr";
 
 let aws: AwsServices;
+let apiKey: string;
 
 // deploy stack helper function
 const deployStack = async (stack: StackDescription): Promise<boolean> => {
-  // let spinner = ui.spinner(stack.initiateMessage);
   const stackId = await aws
     .provisionResources(stack.name, stack.template)
     .catch((err) => deployErrorHandler(err));
-  // spinner.succeed(ui.secondary(stack.initiateCompleteMessage));
 
-  if (stackId) storeStackId(stackId);
+  if (stackId) storeStackId(stack.name, stackId);
 
-  // spinner = ui.spinner(stack.deployingMessage);
   await aws
     .checkStackCreationStatus(stack.name)
     .catch((err) => deployErrorHandler(err));
-  // spinner.succeed(ui.secondary(stack.deployCompleteMessage));
   return Promise.resolve(true);
 };
 
@@ -80,7 +79,7 @@ const tasks = new Listr([
     task: async (_, task) => {
       task.title = "Getting Otter-meet domain";
       const cloudFrontDomain = await aws
-        .getApiEndpoint(cloudFrontStack.name)
+        .getEndpoint(cloudFrontStack.name, "CloudFrontDomainName")
         .catch((err) => deployErrorHandler(err));
 
       modifyApiYaml(cloudFrontDomain); // modify YAML to embed CF domain in Lambda code
@@ -96,13 +95,32 @@ const tasks = new Listr([
     },
   },
   {
+    title: ui.secondary("Gather resource information"),
+    task: async (_, task) => {
+      task.title = "Gather resource information";
+      const apiEndpoint = await aws
+        .getEndpoint(apiStack.name, "APIGateWayEndpoint")
+        .catch((err) => deployErrorHandler(err));
+      config.set({ apiEndpoint });
+      const webSocketEndpoint = await aws
+        .getEndpoint(signalStack.name, "WebSocketAPIGatewayEndpoint")
+        .catch((err) => deployErrorHandler(err));
+      config.set({ webSocketEndpoint });
+      const loadBalancerEndpoint = await aws
+        .getEndpoint(turnStack.name, "LoadBalancerEndpoint")
+        .catch((err) => deployErrorHandler(err));
+      config.set({ loadBalancerEndpoint });
+      task.title = "Resource information acquired";
+    },
+  },
+  {
     title: ui.secondary("Create Otter-meet Application"),
     task: async (_, task) => {
       task.title = "Creating and serving Otter-meet App";
 
       // Get EC2 instance ID from ec2 cloudformation template output
       const EC2InstanceId = await aws
-        .getApiEndpoint(ec2Stack.name)
+        .getEndpoint(ec2Stack.name, "InstanceId")
         .catch((err) => deployErrorHandler(err));
 
       // Get endpoints for writing config file
@@ -111,39 +129,14 @@ const tasks = new Listr([
       const APIEndpoint = config.get("apiEndpoint") as string;
 
       // Generate Config file
-      await writeFile(
-        ELBEndpoint,
-        "1679249183-:-DefaultName",
-        "e5QpXrS9wtJsxGcSzRhZeI0QngE=",
-        WSEndpoint,
-        APIEndpoint
-      );
+      await writeFile(ELBEndpoint, WSEndpoint, APIEndpoint);
 
       // Upload config file to Config s3 bucket
       await aws.uploadFile();
       // Send commands to EC2 to build react app
       await aws.sendEC2Commands(EC2InstanceId);
-      // await aws.destroyResources(ec2Stack.name);
+      await aws.destroyResources(ec2Stack.name);
       task.title = "Otter-meet App is ready.";
-    },
-  },
-  {
-    title: ui.secondary("Gather resource information"),
-    task: async (_, task) => {
-      task.title = "Gather resource information";
-      const apiEndpoint = await aws
-        .getApiEndpoint(apiStack.name)
-        .catch((err) => deployErrorHandler(err));
-      config.set({ apiEndpoint });
-      const webSocketEndpoint = await aws
-        .getApiEndpoint(signalStack.name)
-        .catch((err) => deployErrorHandler(err));
-      config.set({ webSocketEndpoint });
-      const loadBalancerEndpoint = await aws
-        .getApiEndpoint(turnStack.name)
-        .catch((err) => deployErrorHandler(err));
-      config.set({ loadBalancerEndpoint });
-      task.title = "Resource information acquired";
     },
   },
 ]);
@@ -163,20 +156,28 @@ export class Deploy extends Command {
 
     await tasks.run();
 
+    apiKey = generateApiKey();
+
     // summary and goodbye
     ui.printOtter();
     ui.display(`\n${ui.otterGradient(ui.logo)}\n`);
     ui.success("\n🎉 Deployment completed successfully 🎉\n");
-    ui.display(`- API endpoint: ${ui.highlight(config.get("apiEndpoint"))}`);
+    // ui.display(`- API endpoint: ${ui.highlight(config.get("apiEndpoint"))}`);
+    // ui.display(
+    //   `- WebSocket endpoint: ${ui.highlight(config.get("webSocketEndpoint"))}`
+    // );
+    // ui.display(
+    //   `- STUN/TURN URL: ${ui.highlight(
+    //     `turn:${config.get("loadBalancerEndpoint")}:80`
+    //   )}`
+    // );
+    // ui.display(`- Your Otter configuration file: ${ui.highlight(config.path)}`);
+    ui.display(`- Your API Key: ${ui.highlight(apiKey)}`);
     ui.display(
-      `- WebSocket endpoint: ${ui.highlight(config.get("webSocketEndpoint"))}`
+      `\nWe've also created a sample room for you to test out. Open the browser then go to ${ui.highlight(
+        await getSampleRoomUrl()
+      )}. Have fun streaming!`
     );
-    ui.display(
-      `- STUN/TURN URL: ${ui.highlight(
-        `turn:${config.get("loadBalancerEndpoint")}:80`
-      )}`
-    );
-    ui.display(`- Your Otter configuration file: ${ui.highlight(config.path)}`);
 
     ui.display("\nThank you for using Otter, see you next time! 👋");
   }
