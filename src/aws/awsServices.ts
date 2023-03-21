@@ -258,7 +258,7 @@ export class AwsServices implements InterfaceAwsServices {
 
   async deleteS3ConfigBucket(): Promise<void> {
     const bucketName = await this.getConfigBucketName();
-  
+
     // Delete all objects within the bucket
     const objects = await this.s3Client.listObjectsV2({ Bucket: bucketName });
     if (objects.Contents) {
@@ -268,7 +268,7 @@ export class AwsServices implements InterfaceAwsServices {
       };
       await this.s3Client.deleteObjects(deleteParams);
     }
-  
+
     // Delete the bucket
     await this.s3Client.deleteBucket({ Bucket: bucketName });
   }
@@ -347,10 +347,10 @@ export class AwsServices implements InterfaceAwsServices {
   }
 
   async emptyBuckets() {
-    const configBucketName = await this.getConfigBucketName();
+    // const configBucketName = await this.getConfigBucketName();
     const reactBucketName = await this.getReactBucketName();
     const lambdaBucketName = await this.getLambdaBucketName();
-    if (configBucketName) await this.emptyBucket(configBucketName);
+    // if (configBucketName) await this.emptyBucket(configBucketName);
     if (reactBucketName) await this.emptyBucket(reactBucketName);
     if (lambdaBucketName) await this.emptyBucket(lambdaBucketName);
   }
