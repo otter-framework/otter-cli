@@ -8,11 +8,11 @@ import {
   turnStack,
   cloudFrontStack,
   ec2Stack,
+  s3Lambda,
 } from "../utils/stackDescriptions.js";
 import { config, storeStackId } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
 import { deployErrorHandler } from "../utils/errorHandler.js";
-import { modifyApiYaml } from "../utils/yaml.js";
 import { writeFile } from "../utils/writeFile.js";
 import { generateApiKey } from "../utils/generateApiKey.js";
 import { getSampleRoomUrl } from "../utils/sampleRoom.js";
@@ -65,6 +65,24 @@ const concurrentTasks = new Listr(
         task.title = ui.secondary(ec2Stack.deployCompleteMessage);
       },
     },
+    {
+      title: "Prepare Lambdas for deployment",
+      task: async (_, task) => {
+        await deployStack(s3Lambda);
+        const bucketName = await aws.getLambdaBucketName();
+        await aws.uploadFile(
+          "/lambdas/create-room.zip",
+          "create-room.zip",
+          bucketName
+        );
+        await aws.uploadFile(
+          "/lambdas/authorizer.zip",
+          "authorizer.zip",
+          bucketName
+        );
+        task.title = ui.secondary("Lambdas are ready.");
+      },
+    },
   ],
   { concurrent: true }
 );
@@ -75,23 +93,23 @@ const tasks = new Listr([
     task: () => concurrentTasks,
   },
   {
+    title: ui.secondary(apiStack.deployingMessage),
+    task: async (_, task) => {
+      task.title = apiStack.deployingMessage;
+      await deployStack(apiStack);
+      task.title = apiStack.deployCompleteMessage;
+    },
+  },
+  {
     title: ui.secondary("Prepare Otter-meet domain"),
     task: async (_, task) => {
       task.title = "Getting Otter-meet domain";
       const cloudFrontDomain = await aws
         .getEndpoint(cloudFrontStack.name, "CloudFrontDomainName")
         .catch((err) => deployErrorHandler(err));
-
-      modifyApiYaml(cloudFrontDomain); // modify YAML to embed CF domain in Lambda code
+      await aws.saveDomainToDynamo(cloudFrontDomain);
+      // modifyApiYaml(cloudFrontDomain); // modify YAML to embed CF domain in Lambda code
       task.title = "Otter-meet domain is ready.";
-    },
-  },
-  {
-    title: ui.secondary(apiStack.deployingMessage),
-    task: async (_, task) => {
-      task.title = apiStack.deployingMessage;
-      await deployStack(apiStack);
-      task.title = apiStack.deployCompleteMessage;
     },
   },
   {
@@ -132,11 +150,20 @@ const tasks = new Listr([
       await writeFile(ELBEndpoint, WSEndpoint, APIEndpoint);
 
       // Upload config file to Config s3 bucket
-      await aws.uploadFile();
+      const bucketName = await aws.getConfigBucketName();
+      await aws.uploadFile("/configs.js", "configs.js", bucketName);
       // Send commands to EC2 to build react app
       await aws.sendEC2Commands(EC2InstanceId);
       await aws.destroyResources(ec2Stack.name);
       task.title = "Otter-meet App is ready.";
+    },
+  },
+  {
+    title: ui.secondary("Generate API Key"),
+    task: async () => {
+      apiKey = generateApiKey();
+      config.set("apiKey", apiKey);
+      await aws.saveApiKeyToDynamo(apiKey);
     },
   },
 ]);
@@ -156,22 +183,11 @@ export class Deploy extends Command {
 
     await tasks.run();
 
-    apiKey = generateApiKey();
-
     // summary and goodbye
     ui.printOtter();
     ui.display(`\n${ui.otterGradient(ui.logo)}\n`);
     ui.success("\n🎉 Deployment completed successfully 🎉\n");
-    // ui.display(`- API endpoint: ${ui.highlight(config.get("apiEndpoint"))}`);
-    // ui.display(
-    //   `- WebSocket endpoint: ${ui.highlight(config.get("webSocketEndpoint"))}`
-    // );
-    // ui.display(
-    //   `- STUN/TURN URL: ${ui.highlight(
-    //     `turn:${config.get("loadBalancerEndpoint")}:80`
-    //   )}`
-    // );
-    // ui.display(`- Your Otter configuration file: ${ui.highlight(config.path)}`);
+    ui.display(`- API endpoint: ${ui.highlight(config.get("apiEndpoint"))}`);
     ui.display(`- Your API Key: ${ui.highlight(apiKey)}`);
     ui.display(
       `\nWe've also created a sample room for you to test out. Open the browser then go to ${ui.highlight(

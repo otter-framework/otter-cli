@@ -5,7 +5,7 @@ import { AwsServices } from "../aws/awsServices.js";
 import { config } from "../utils/config.js";
 import * as ui from "../utils/ui.js";
 import { errorHandler } from "../utils/errorHandler.js";
-import { signalStack } from "../utils/stackDescriptions.js";
+import { s3Lambda, signalStack } from "../utils/stackDescriptions.js";
 import Listr from "listr";
 
 let aws: AwsServices;
@@ -29,7 +29,7 @@ const cleanup = () => {
 const destroy = async () => {
   const concurrentTaskList: Listr.ListrTask[] = [];
   for (let stack in createdStacks) {
-    if (stack === signalStack.name) continue;
+    if (stack === signalStack.name || stack === s3Lambda.name) continue;
     concurrentTaskList.push({
       title: `Teardown ${stack}`,
       task: async () => destroyStack(createdStacks[stack]),
@@ -45,6 +45,10 @@ const destroy = async () => {
     {
       title: "Teardown Otter Infrastructure",
       task: () => concurrentTask,
+    },
+    {
+      title: "Teardown S3 buckets",
+      task: async () => await destroyStack(createdStacks[s3Lambda.name]),
     },
     {
       title: "Teardown Otter Signaling Service",

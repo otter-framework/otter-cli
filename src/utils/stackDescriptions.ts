@@ -7,6 +7,15 @@ export type StackDescription = {
   deployCompleteMessage: string;
 };
 
+export const s3Lambda: StackDescription = {
+  name: "S3Lambda",
+  template: "/templates/S3Lambda.yaml",
+  initiateMessage: "Initiating S3Lambda deployment",
+  initiateCompleteMessage: "S3Lambda deployment initiated",
+  deployingMessage: "Deploying S3Lambda",
+  deployCompleteMessage: "S3Lambda is deployed.",
+};
+
 export const cloudFrontStack: StackDescription = {
   name: "CloudFrontStack",
   template: "/templates/cloudFront.yaml",

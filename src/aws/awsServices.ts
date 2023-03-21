@@ -22,13 +22,13 @@ import {
   ObjectIdentifier,
   DeleteObjectsCommandInput,
 } from "@aws-sdk/client-s3";
+import { CloudFrontClient } from "@aws-sdk/client-cloudfront";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  CloudFrontClient,
-  UpdateDistributionCommand,
-  UpdateDistributionCommandInput,
-  ListDistributionsCommand,
-  GetDistributionConfigCommand,
-} from "@aws-sdk/client-cloudfront";
+  DynamoDBDocumentClient,
+  PutCommand,
+  PutCommandInput,
+} from "@aws-sdk/lib-dynamodb";
 
 interface InterfaceAwsServices {
   provisionResources: (
@@ -46,6 +46,7 @@ export class AwsServices implements InterfaceAwsServices {
   ec2Client: EC2;
   ssmClient: SSM;
   cloudfront: CloudFrontClient;
+  dynamo: DynamoDBDocumentClient;
   checkInterval: number;
 
   constructor(credentials: AwsCredentialIdentity, region: string) {
@@ -54,6 +55,9 @@ export class AwsServices implements InterfaceAwsServices {
     this.ec2Client = new EC2({ credentials, region });
     this.ssmClient = new SSM({ credentials, region });
     this.cloudfront = new CloudFrontClient({ credentials, region });
+    this.dynamo = DynamoDBDocumentClient.from(
+      new DynamoDBClient({ credentials, region })
+    );
     this.checkInterval = 3000;
   }
 
@@ -152,13 +156,16 @@ export class AwsServices implements InterfaceAwsServices {
     return endpoint;
   }
 
-  async uploadFile(): Promise<void> {
-    // Set the bucket and file name
-    const bucketName = await this.getConfigBucketName();
-    const fileName = "configs.js";
+  async uploadFile(
+    relativePath: string,
+    fileName: string,
+    bucketName: string
+  ): Promise<void> {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
 
     // Read the file to be uploaded
-    const fileContent = fs.readFileSync(fileName);
+    const fileContent = fs.readFileSync(path.join(__dirname, relativePath));
 
     const params = new PutObjectCommand({
       Bucket: bucketName,
@@ -172,6 +179,31 @@ export class AwsServices implements InterfaceAwsServices {
     } catch (err) {
       console.error(err);
     }
+  }
+
+  async getLambdaBucketName(): Promise<string> {
+    const data = await this.s3Client.send(new ListBucketsCommand({}));
+    const buckets = data.Buckets;
+    if (buckets && buckets.length === 0) return "";
+    const lambdaBuckets = buckets?.filter((bucket) =>
+      bucket.Name?.startsWith("s3lambda")
+    );
+    if (lambdaBuckets && lambdaBuckets.length === 0) return "";
+    let target = lambdaBuckets?.[0];
+    let newestTime = lambdaBuckets?.[0].CreationDate;
+    lambdaBuckets?.forEach((bucket) => {
+      if (
+        bucket.CreationDate &&
+        newestTime &&
+        bucket.CreationDate > newestTime
+      ) {
+        target = bucket;
+      }
+    });
+
+    if (target?.Name) return target?.Name;
+
+    return "";
   }
 
   async getConfigBucketName(): Promise<string> {
@@ -300,8 +332,10 @@ export class AwsServices implements InterfaceAwsServices {
   async emptyBuckets() {
     const configBucketName = await this.getConfigBucketName();
     const reactBucketName = await this.getReactBucketName();
+    const lambdaBucketName = await this.getLambdaBucketName();
     if (configBucketName) await this.emptyBucket(configBucketName);
     if (reactBucketName) await this.emptyBucket(reactBucketName);
+    if (lambdaBucketName) await this.emptyBucket(lambdaBucketName);
   }
 
   async emptyBucket(bucket: string) {
@@ -324,43 +358,24 @@ export class AwsServices implements InterfaceAwsServices {
     }
   }
 
-  async updateCloudFrontDomain(domain: string) {
-    const response = await this.cloudfront.send(
-      new ListDistributionsCommand({})
-    );
-    const id = response.DistributionList?.Items?.[0].Id;
-    console.log("CF id: ", id);
-    const distributionConfigResponse = await this.cloudfront.send(
-      new GetDistributionConfigCommand({ Id: id })
-    );
-    const distributionConfig = distributionConfigResponse.DistributionConfig;
-    const etag = distributionConfigResponse.ETag;
-    console.log("DConfig: ", distributionConfig);
-    const origin = distributionConfig?.Origins?.Items?.[0];
-    console.log("origin: ", origin);
-    if (origin) {
-      origin.DomainName =
-        "cloudfrontstack-s3bucket-1fauf2jcmbv9l.s3-website.us-east-2.amazonaws.com";
-      origin.CustomOriginConfig = {
-        HTTPPort: 80,
-        HTTPSPort: 443,
-        OriginProtocolPolicy: "http-only",
-        OriginSslProtocols: {
-          Quantity: 3,
-          Items: ["TLSv1", "TLSv1.1", "TLSv1.2"],
-        },
-        OriginReadTimeout: 30,
-        OriginKeepaliveTimeout: 5,
-      };
-      delete origin.S3OriginConfig;
-    }
-    console.log("new origin: ", origin);
-    const params: UpdateDistributionCommandInput = {
-      Id: id,
-      DistributionConfig: distributionConfig,
-      IfMatch: etag,
+  async saveApiKeyToDynamo(apiKey: string) {
+    const params: PutCommandInput = {
+      TableName: "APIKeyTable",
+      Item: { user: "otter-admin", apiKey },
     };
-    await this.cloudfront.send(new UpdateDistributionCommand(params));
+
+    const result = await this.dynamo.send(new PutCommand(params));
+    console.log(result);
+  }
+
+  async saveDomainToDynamo(domain: string) {
+    const params: PutCommandInput = {
+      TableName: "ConfigTable",
+      Item: { user: "otter-admin", domain },
+    };
+
+    const result = await this.dynamo.send(new PutCommand(params));
+    console.log(result);
   }
 
   // private methods below
