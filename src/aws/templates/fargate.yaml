@@ -114,6 +114,18 @@ Resources:
       GatewayId: !Ref MyInternetGateway
       RouteTableId: !Ref MyRouteTable
 
+  ECSServiceAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [application-autoscaling.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole"
+
   ecsTaskExecutionRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -463,6 +475,11 @@ Resources:
     Properties:
       TargetType: ip
       TargetGroupName: otter-coturn-target-group
+      TargetGroupAttributes:
+        - Key: "stickiness.enabled"
+          Value: "true"
+        - Key: "stickiness.type"
+          Value: "source_ip"
       Protocol: UDP
       Port: 80
       VpcId: !Ref MyVPC
@@ -500,6 +517,29 @@ Resources:
       - OtterCoturnTargetGroup
       - OtterCoturnNLB
 
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: "service/CFNCluster/cfn-service"
+      RoleARN: !GetAtt ECSServiceAutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: ServiceAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        TargetValue: 75
+
   MyNetworkInterface:
     Type: AWS::EC2::NetworkInterface
     Properties:
@@ -509,6 +549,7 @@ Resources:
         - !Ref MySecurityGroup
       PrivateIpAddress: 10.0.1.25
       SourceDestCheck: true
+
 Outputs:
   LoadBalancerEndpoint:
     Value: !GetAtt OtterCoturnNLB.DNSName
