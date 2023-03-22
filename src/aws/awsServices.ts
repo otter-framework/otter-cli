@@ -25,7 +25,7 @@ import {
 import { CloudFrontClient } from "@aws-sdk/client-cloudfront";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient,
+  DynamoDBDocument,
   PutCommand,
   PutCommandInput,
 } from "@aws-sdk/lib-dynamodb";
@@ -46,7 +46,7 @@ export class AwsServices implements InterfaceAwsServices {
   ec2Client: EC2;
   ssmClient: SSM;
   cloudfront: CloudFrontClient;
-  dynamo: DynamoDBDocumentClient;
+  dynamo: DynamoDBDocument;
   checkInterval: number;
 
   constructor(credentials: AwsCredentialIdentity, region: string) {
@@ -55,9 +55,8 @@ export class AwsServices implements InterfaceAwsServices {
     this.ec2Client = new EC2({ credentials, region });
     this.ssmClient = new SSM({ credentials, region });
     this.cloudfront = new CloudFrontClient({ credentials, region });
-    this.dynamo = DynamoDBDocumentClient.from(
-      new DynamoDBClient({ credentials, region })
-    );
+    const db = new DynamoDBClient({ credentials, region });
+    this.dynamo = DynamoDBDocument.from(db);
     this.checkInterval = 3000;
   }
 
