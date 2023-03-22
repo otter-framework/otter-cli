@@ -65,29 +65,29 @@ const concurrentTasks = new Listr(
         task.title = ui.secondary(ec2Stack.deployCompleteMessage);
       },
     },
-    {
-      title: "Prepare Lambdas for deployment",
-      task: async (_, task) => {
-        await deployStack(s3Lambda);
-        const bucketName = await aws.getLambdaBucketName();
-        await aws.uploadFile(
-          "/lambdas/create-room.zip",
-          "create-room.zip",
-          bucketName
-        );
-        await aws.uploadFile(
-          "/lambdas/authorizer.zip",
-          "authorizer.zip",
-          bucketName
-        );
-        task.title = ui.secondary("Lambdas are ready.");
-      },
-    },
   ],
   { concurrent: true }
 );
 
 const tasks = new Listr([
+  {
+    title: "Prepare Lambdas for deployment",
+    task: async (_, task) => {
+      await deployStack(s3Lambda);
+      const bucketName = await aws.getLambdaBucketName();
+      await aws.uploadFile(
+        "/lambdas/create-room.zip",
+        "create-room.zip",
+        bucketName
+      );
+      await aws.uploadFile(
+        "/lambdas/authorizer.zip",
+        "authorizer.zip",
+        bucketName
+      );
+      task.title = ui.secondary("Lambdas are ready.");
+    },
+  },
   {
     title: "Deploy Otter Infrastructure",
     task: () => concurrentTasks,
