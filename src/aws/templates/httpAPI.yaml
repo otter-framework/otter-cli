@@ -14,21 +14,7 @@ Resources:
         WriteCapacityUnits: 5
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
-  APIKeyTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: APIKeyTable
-      KeySchema:
-        - AttributeName: user
-          KeyType: HASH
-      AttributeDefinitions:
-        - AttributeName: user
-          AttributeType: S
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
-    UpdateReplacePolicy: Delete
-    DeletionPolicy: Delete
+
   ConfigTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -276,7 +262,7 @@ Resources:
     Properties:
       BatchSize: 1
       Enabled: true
-      EventSourceArn: !ImportValue NewTestSignalStack-StreamArn
+      EventSourceArn: !ImportValue StreamArn
       FunctionName: !Ref TableChangeLambdaFunction
       StartingPosition: LATEST
   ApiGateway:
@@ -559,7 +545,7 @@ Resources:
             Effect: Allow
             Resource:
               - !GetAtt RoomCountsTable2301.Arn
-              - !GetAtt APIKeyTable.Arn
+              - !ImportValue APIKeyTableArn
               - !GetAtt ConfigTable.Arn
               - !Ref AWS::NoValue
         Version: 2012-10-17
