@@ -381,7 +381,6 @@ export class AwsServices implements InterfaceAwsServices {
     };
 
     const result = await this.dynamo.send(new PutCommand(params));
-    console.log(result);
   }
 
   async saveDomainToDynamo(domain: string) {
@@ -391,7 +390,6 @@ export class AwsServices implements InterfaceAwsServices {
     };
 
     const result = await this.dynamo.send(new PutCommand(params));
-    console.log(result);
   }
 
   // private methods below

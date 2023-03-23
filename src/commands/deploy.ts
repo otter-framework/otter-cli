@@ -161,10 +161,11 @@ const tasks = new Listr([
   },
   {
     title: ui.secondary("Generate API Key"),
-    task: async () => {
+    task: async (_, task) => {
       apiKey = generateApiKey();
       config.set("apiKey", apiKey);
       await aws.saveApiKeyToDynamo(apiKey);
+      task.title = ui.secondary("API Key is ready.");
     },
   },
 ]);

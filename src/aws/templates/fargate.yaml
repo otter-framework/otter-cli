@@ -526,6 +526,7 @@ Resources:
       RoleARN: !GetAtt ECSServiceAutoScalingRole.Arn
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
+    DependsOn: ECSService
 
   AutoScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy

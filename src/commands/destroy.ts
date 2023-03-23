@@ -47,12 +47,12 @@ const destroy = async () => {
       task: () => concurrentTask,
     },
     {
-      title: "Teardown S3 buckets",
-      task: async () => await destroyStack(createdStacks[s3Lambda.name]),
-    },
-    {
       title: "Teardown Otter Signaling Service",
       task: async () => await destroyStack(createdStacks[signalStack.name]),
+    },
+    {
+      title: "Teardown S3 buckets",
+      task: async () => await destroyStack(createdStacks[s3Lambda.name]),
     },
     {
       title: "Final Cleanup",
