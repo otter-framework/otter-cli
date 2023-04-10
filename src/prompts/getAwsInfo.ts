@@ -38,7 +38,7 @@ export const GetAwsInfo = async (): Promise<Answers> => {
   // if valid local AWS credentials are found, save it to config
   if (Object.keys(localAwsCredentials).length > 0) {
     const credentials = localAwsCredentials as AwsCredentialIdentity;
-    ui.success("Local AWS credentials found.");
+    ui.success("  Local AWS credentials found.");
     config.set({
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
@@ -53,7 +53,7 @@ export const GetAwsInfo = async (): Promise<Answers> => {
   const region = config.get("region") as string;
 
   if (region) {
-    ui.display(`Your region: ${ui.highlight(region)}\n`);
+    ui.display(`  Your region: ${ui.highlight(region)}\n`);
     preAnswered["region"] = region;
   }
 

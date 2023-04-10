@@ -71,7 +71,7 @@ const concurrentTasks = new Listr(
 
 const tasks = new Listr([
   {
-    title: "Prepare Lambdas for deployment",
+    title: "Prepare for deployment",
     task: async (_, task) => {
       await deployStack(s3Lambda);
       const bucketName = await aws.getLambdaBucketName();
@@ -85,7 +85,7 @@ const tasks = new Listr([
         "authorizer.zip",
         bucketName
       );
-      task.title = ui.secondary("Lambdas are ready.");
+      task.title = "Prepare for deployment";
     },
   },
   {
@@ -101,15 +101,15 @@ const tasks = new Listr([
     },
   },
   {
-    title: ui.secondary("Prepare Otter-meet domain"),
+    title: ui.secondary("Prepare Otter Video domain"),
     task: async (_, task) => {
-      task.title = "Getting Otter-meet domain";
+      task.title = "Getting Otter Video domain";
       const cloudFrontDomain = await aws
         .getEndpoint(cloudFrontStack.name, "CloudFrontDomainName")
         .catch((err) => deployErrorHandler(err));
       await aws.saveDomainToDynamo(cloudFrontDomain);
       // modifyApiYaml(cloudFrontDomain); // modify YAML to embed CF domain in Lambda code
-      task.title = "Otter-meet domain is ready.";
+      task.title = "Otter Video domain is ready.";
     },
   },
   {
@@ -128,13 +128,13 @@ const tasks = new Listr([
         .getEndpoint(turnStack.name, "LoadBalancerEndpoint")
         .catch((err) => deployErrorHandler(err));
       config.set({ loadBalancerEndpoint });
-      task.title = "Resource information acquired";
+      task.title = "Resource information acquired.";
     },
   },
   {
-    title: ui.secondary("Create Otter-meet Application"),
+    title: ui.secondary("Create Otter Video Web Application"),
     task: async (_, task) => {
-      task.title = "Creating and serving Otter-meet App";
+      task.title = "Creating and serving Otter Video Web App";
 
       // Get EC2 instance ID from ec2 cloudformation template output
       const EC2InstanceId = await aws
@@ -156,7 +156,7 @@ const tasks = new Listr([
       await aws.sendEC2Commands(EC2InstanceId);
       await aws.destroyResources(ec2Stack.name);
       await aws.deleteS3ConfigBucket();
-      task.title = "Otter-meet App is ready.";
+      task.title = "Otter Video App is ready to go.";
     },
   },
   {
@@ -165,7 +165,7 @@ const tasks = new Listr([
       apiKey = generateApiKey();
       config.set("apiKey", apiKey);
       await aws.saveApiKeyToDynamo(apiKey);
-      task.title = ui.secondary("API Key is ready.");
+      task.title = "API Key generated.";
     },
   },
 ]);
@@ -181,22 +181,33 @@ export class Deploy extends Command {
     const { credentials, region } = await GetAwsInfo();
     aws = new AwsServices(credentials, region);
 
-    ui.display("\n🦦 Otter is being deployed and might take a few minutes\n");
+    ui.display("\n  🦦 Otter is being deployed and might take a few minutes\n");
 
     await tasks.run();
 
     // summary and goodbye
-    ui.printOtter();
-    ui.display(`\n${ui.otterGradient(ui.logo)}\n`);
-    ui.success("\n🎉 Deployment completed successfully 🎉\n");
-    ui.display(`- API endpoint: ${ui.highlight(config.get("apiEndpoint"))}`);
-    ui.display(`- Your API Key: ${ui.highlight(apiKey)}`);
+    // ui.printOtter();
+    ui.display(`\n  ${ui.otterGradient(ui.logo)}\n`);
+    ui.success("\n  🎉 Deployment completed successfully 🎉\n");
+    ui.display(`  - API endpoint: ${ui.highlight(config.get("apiEndpoint"))}`);
+    // ui.display(
+    //   `  - API endpoint: https://demo1a2b.execute-api.us-east-2.amazonaws.com/v1`
+    // );
+    ui.display(`  - Your API Key: ${ui.highlight(apiKey)}`);
+    // ui.display(
+    //   `  - Your API Key: DeMoYzAyMTctYWQ0Ny00MzA3LWI1M2EtZTgxOTI3NTZkYzgz`
+    // );
     ui.display(
-      `\nWe've also created a sample room for you to test out. Open the browser then go to ${ui.highlight(
+      `\n  We've also created a sample room for you to test out. Open the browser then go to ${ui.highlight(
         await getSampleRoomUrl()
-      )}. Have fun streaming!`
+      )}.`
     );
-
-    ui.display("\nThank you for using Otter, see you next time! 👋");
+    // ui.display(
+    //   `\nWe've also created a sample room for you to test out. Open the browser then go to ${ui.highlight(
+    //     "https://demo0k10.cloudfront.net/otter-video/sample-room?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjoicm1fMXhNNmRfdHVuMyIsImlhdCI6MTY4MDYzMjI0MiwiZXhwIjoxNjgwODA1MDQyfQ.uTb_hGg3vdCfF0vDhfWv_BuhC3RzrdFwKtS7fB58Aks"
+    //   )}.`
+    // );
+    ui.success(`\n  Have fun streaming!`);
+    ui.display("\n  Thank you for using Otter, see you next time! 👋");
   }
 }

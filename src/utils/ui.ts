@@ -61,7 +61,7 @@ export const generateLogo = (): void => {
 
 export const hello = (): void => {
   clear();
-  console.log(otterGradient("\nWelcome to Otter CLI!\n"));
+  console.log(otterGradient("\n  Welcome to Otter CLI!\n"));
 };
 
 export const printOtter = (): void => {

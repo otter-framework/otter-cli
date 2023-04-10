@@ -293,7 +293,7 @@ export class AwsServices implements InterfaceAwsServices {
         // `export NVM_DIR="$HOME/.nvm" [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"`,
         // "sudo nvm install --lts",
         "curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s lts",
-        "git clone https://github.com/otter-framework/otter-client",
+        "git clone -b chris https://github.com/otter-framework/otter-client",
         `location=$(find / -type d -name "otter-client")`,
         "cd $location",
         "npm i",
