@@ -8,7 +8,7 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: "AES256"
-      AccessControl: PublicRead
+      # AccessControl: PublicRead
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
@@ -22,7 +22,7 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: "AES256"
-      AccessControl: PublicRead
+      # AccessControl: PublicRead
 
   S3BucketRole:
     Type: "AWS::IAM::Role"
@@ -37,40 +37,40 @@ Resources:
             Action: "sts:AssumeRole"
       Path: "/"
 
-  S3BucketPolicy:
-    Type: "AWS::S3::BucketPolicy"
-    Properties:
-      Bucket: !Ref S3Bucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: "*"
-            Action:
-              - "s3:GetObject"
-              - "s3:PutObject"
-            Resource: !Join
-              - ""
-              - - "arn:aws:s3:::"
-                - !Ref S3Bucket
-                - /*
+  # S3BucketPolicy:
+  #   Type: "AWS::S3::BucketPolicy"
+  #   Properties:
+  #     Bucket: !Ref S3Bucket
+  #     PolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal: "*"
+  #           Action:
+  #             - "s3:GetObject"
+  #             - "s3:PutObject"
+  #           Resource: !Join
+  #             - ""
+  #             - - "arn:aws:s3:::"
+  #               - !Ref S3Bucket
+  #               - /*
 
-  S3ConfigBucketPolicy:
-    Type: "AWS::S3::BucketPolicy"
-    Properties:
-      Bucket: !Ref S3ConfigBucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: "*"
-            Action:
-              - "s3:GetObject"
-            Resource: !Join
-              - ""
-              - - "arn:aws:s3:::"
-                - !Ref S3ConfigBucket
-                - /*
+  # S3ConfigBucketPolicy:
+  #   Type: "AWS::S3::BucketPolicy"
+  #   Properties:
+  #     Bucket: !Ref S3ConfigBucket
+  #     PolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal: "*"
+  #           Action:
+  #             - "s3:GetObject"
+  #           Resource: !Join
+  #             - ""
+  #             - - "arn:aws:s3:::"
+  #               - !Ref S3ConfigBucket
+  #               - /*
 
   S3BucketRolePolicy:
     Type: "AWS::IAM::Policy"
