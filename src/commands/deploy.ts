@@ -47,7 +47,7 @@ const concurrentTasks = new Listr(
     {
       title: turnStack.deployingMessage,
       task: async (_, task) => {
-        await deployStack(turnStack);
+        await deployStack(turnStack); 
         task.title = ui.secondary(turnStack.deployCompleteMessage);
       },
     },
@@ -92,6 +92,15 @@ const tasks = new Listr([
       task.title = apiStack.deployingMessage;
       await deployStack(apiStack);
       task.title = apiStack.deployCompleteMessage;
+    },
+  },
+  {
+    title: ui.secondary("Modifying S3 permissions"),
+    task: async (_, task) => {
+      task.title = "Modifying S3 permissions";
+      await aws.changeBucketPublicAccess();
+      await aws.addBucketPolicy();
+      task.title = "S3 Buckets successfully changed.";
     },
   },
   {

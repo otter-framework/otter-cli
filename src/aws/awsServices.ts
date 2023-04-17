@@ -21,6 +21,9 @@ import {
   DeleteObjectsCommand,
   ObjectIdentifier,
   DeleteObjectsCommandInput,
+  PutBucketPolicyCommand, 
+  PutBucketPolicyCommandInput,
+  PutPublicAccessBlockCommand,
 } from "@aws-sdk/client-s3";
 import {
   CloudFrontClient,
@@ -172,6 +175,77 @@ export class AwsServices implements InterfaceAwsServices {
     } catch (err) {
       console.error(err);
     }
+  }
+
+  async changeBucketPublicAccess(): Promise<void> {
+    const reactBucketName = await this.getReactBucketName();
+    const configBucketName = await this.getConfigBucketName();
+
+    const blockPublicAccessSettings = {
+      BlockPublicAcls: false,
+      IgnorePublicAcls: false,
+      BlockPublicPolicy: false,
+      RestrictPublicBuckets: false,
+    };
+    
+    const reactBucketParams = {
+      Bucket: reactBucketName,
+      PublicAccessBlockConfiguration: blockPublicAccessSettings,
+    };
+
+    const configBucketParams = {
+      Bucket: configBucketName,
+      PublicAccessBlockConfiguration: blockPublicAccessSettings,
+    };
+    await this.s3Client.putPublicAccessBlock(reactBucketParams);
+    await this.s3Client.putPublicAccessBlock(configBucketParams); 
+  }
+
+  async addBucketPolicy(): Promise<void> {
+    const reactBucketName = await this.getReactBucketName();
+    const configBucketName = await this.getConfigBucketName();
+
+    const reactBucketPolicy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: "*",
+          Action: ["s3:GetObject", "s3:PutObject"],
+          Resource: [`arn:aws:s3:::${reactBucketName}/*`],
+        },
+      ],
+    };
+
+    const configBucketPolicy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: "*",
+          Action: ["s3:GetObject", "s3:PutObject"],
+          Resource: [`arn:aws:s3:::${configBucketName}/*`],
+        },
+      ],
+    };
+
+    const reactParams: PutBucketPolicyCommandInput = {
+      Bucket: reactBucketName,
+      Policy: JSON.stringify(reactBucketPolicy),
+    };
+
+    const configParams: PutBucketPolicyCommandInput = {
+      Bucket: configBucketName,
+      Policy: JSON.stringify(configBucketPolicy),
+    };
+
+    const reactCommand = new PutBucketPolicyCommand(reactParams);
+
+    const configCommand = new PutBucketPolicyCommand(configParams);
+
+    await this.s3Client.send(reactCommand);
+
+    await this.s3Client.send(configCommand)
   }
 
   async getConfigBucketName(): Promise<string> {
