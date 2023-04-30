@@ -30,7 +30,7 @@ $ npm install -g otter-video-cli
 $ otter COMMAND
 running command...
 $ otter (--version)
-otter-video-cli/0.5.2 darwin-x64 node-v19.5.0
+otter-video-cli/0.5.3 darwin-x64 node-v19.5.0
 $ otter --help [COMMAND]
 USAGE
   $ otter COMMAND
@@ -58,7 +58,7 @@ DESCRIPTION
   deploy otter aws infrastructure
 ```
 
-_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.5.2/dist/commands/deploy.ts)_
+_See code: [dist/commands/deploy.ts](https://github.com/otter-framework/otter-cli/blob/v0.5.3/dist/commands/deploy.ts)_
 
 ## `otter destroy`
 
@@ -72,7 +72,7 @@ DESCRIPTION
   destroy otter aws infrastructure
 ```
 
-_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.5.2/dist/commands/destroy.ts)_
+_See code: [dist/commands/destroy.ts](https://github.com/otter-framework/otter-cli/blob/v0.5.3/dist/commands/destroy.ts)_
 
 ## `otter dev`
 
@@ -86,7 +86,7 @@ DESCRIPTION
   why are you here?
 ```
 
-_See code: [dist/commands/dev.ts](https://github.com/otter-framework/otter-cli/blob/v0.5.2/dist/commands/dev.ts)_
+_See code: [dist/commands/dev.ts](https://github.com/otter-framework/otter-cli/blob/v0.5.3/dist/commands/dev.ts)_
 
 ## `otter help [COMMANDS]`
 
@@ -106,5 +106,5 @@ DESCRIPTION
   Display help for otter.
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v5.2.8/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v5.2.9/src/commands/help.ts)_
 <!-- commandsstop -->
