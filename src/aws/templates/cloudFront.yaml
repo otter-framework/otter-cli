@@ -3,7 +3,7 @@ Resources:
     Type: "AWS::S3::Bucket"
     DeletionPolicy: "Delete"
     Properties:
-      # BucketName: react-app-bucket2301
+      BucketName: react-app-bucket2301
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -17,7 +17,7 @@ Resources:
     Type: "AWS::S3::Bucket"
     DeletionPolicy: "Delete"
     Properties:
-      # BucketName: config-file-bucket2301
+      BucketName: config-file-bucket2301
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:

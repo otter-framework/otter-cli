@@ -2,7 +2,7 @@ export const RTCConfig = {
       iceServers: [
         {
           urls: [
-            "turn:otter-coturn-nlb-b4657b32c0f832cf.elb.us-east-2.amazonaws.com:80",
+            "turn:otter-coturn-nlb-1e003da3ecd9ec11.elb.us-east-2.amazonaws.com:80",
           ],
           username: "1679341410-:-DefaultName",
           credential: "9iNiJKJIpVC293f715Jf0+RdcMg=",
@@ -11,5 +11,5 @@ export const RTCConfig = {
       iceCandidatePoolSize: 10,
     };
     
-  export const WebSocketEndpoint = "wss://z7l2hi12r8.execute-api.us-east-2.amazonaws.com/dev";
-  export const RESTAPIEndpoint = "https://mfiap95kc1.execute-api.us-east-2.amazonaws.com/v1";
+  export const WebSocketEndpoint = "wss://8giz6mrbsd.execute-api.us-east-2.amazonaws.com/dev";
+  export const RESTAPIEndpoint = "https://4wkv9i0pcb.execute-api.us-east-2.amazonaws.com/v1";
