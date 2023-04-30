@@ -14,6 +14,22 @@ Resources:
         WriteCapacityUnits: 5
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ConfigTable
+      KeySchema:
+        - AttributeName: user
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: user
+          AttributeType: S
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
   DynamoDBLambdaPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -246,7 +262,7 @@ Resources:
     Properties:
       BatchSize: 1
       Enabled: true
-      EventSourceArn: !ImportValue NewTestSignalStack-StreamArn
+      EventSourceArn: !ImportValue StreamArn
       FunctionName: !Ref TableChangeLambdaFunction
       StartingPosition: LATEST
   ApiGateway:
@@ -257,7 +273,7 @@ Resources:
       RouteSelectionExpression: ${request.method} ${request.path}
       CorsConfiguration:
         AllowOrigins:
-          - '*'
+          - "*"
         AllowMethods:
           - GET
           - POST
@@ -267,28 +283,31 @@ Resources:
           - OPTIONS
           - PATCH
         AllowHeaders:
-          - '*'
+          - "*"
         MaxAge: 86400
   RoomsRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ApiGateway
       RouteKey: GET /room/{id}
-      AuthorizationType: NONE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref APITokenAuthorizer
       Target: !Sub integrations/${RoomsGetIntegration}
   CreateRoomRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ApiGateway
       RouteKey: POST /createRoom
-      AuthorizationType: NONE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref APIKeyAuthorizer
       Target: !Sub integrations/${CreateRoomIntegration}
   CredentialsRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ApiGateway
       RouteKey: GET /credentials
-      AuthorizationType: NONE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref APITokenAuthorizer
       Target: !Sub integrations/${CredentialsIntegration}
   DefaultRoute:
     Type: AWS::ApiGatewayV2::Route
@@ -304,7 +323,7 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub >-
         arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DefaultLambdaFunction.Arn}/invocations
-      PayloadFormatVersion: '2.0'
+      PayloadFormatVersion: "2.0"
   RoomsGetIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -312,7 +331,7 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub >-
         arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RoomsGetFunction.Arn}/invocations
-      PayloadFormatVersion: '2.0'
+      PayloadFormatVersion: "2.0"
   CreateRoomIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -320,7 +339,7 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub >-
         arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateRoomFunction.Arn}/invocations
-      PayloadFormatVersion: '2.0'
+      PayloadFormatVersion: "2.0"
   CredentialsIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -328,7 +347,7 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub >-
         arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GenerateTurnCredentialsFunction.Arn}/invocations
-      PayloadFormatVersion: '2.0'
+      PayloadFormatVersion: "2.0"
   DefaultLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -526,6 +545,8 @@ Resources:
             Effect: Allow
             Resource:
               - !GetAtt RoomCountsTable2301.Arn
+              - !ImportValue APIKeyTableArn
+              - !GetAtt ConfigTable.Arn
               - !Ref AWS::NoValue
         Version: 2012-10-17
       PolicyName: LambdaDefaultPolicy2301
@@ -535,156 +556,34 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Code:
-        ZipFile: |
-          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
-          const {
-            PutCommand,
-            GetCommand,
-            ScanCommand,
-          } = require("@aws-sdk/lib-dynamodb");
-          const crypto = require("crypto");
-
-          const createErrorResponse = (message) => {
-            return { message };
-          };
-
-          const generateRoomId = () => {
-            const id = "rm_" + crypto.randomUUID();
-            return id;
-          };
-
-          const TABLE_NAME = "RoomCountsTable2301";
-          const REGION = process.env.AWS_REGION || "us-east-2";
-          const marshallOptions = {
-            removeUndefinedValues: true, // false, by default.
-          };
-
-          const client = new DynamoDBClient({ region: REGION });
-          const dynamo = DynamoDBDocumentClient.from(client, {
-            marshallOptions,
-          });
-
-          const constructRoomResource = (config, domainUrl) => {
-            const roomId = generateRoomId();
-            const now = new Date();
-            const utc = now.toUTCString();
-            const url = domainUrl + '/otter-meet/' + (config.uniqueName || roomId)
-            const roomResource = {
-              roomId,
-              unique_name: config.uniqueName || "",
-              created_at: utc,
-              updated_at: utc,
-              status: "open",
-              url,
-            };
-            
-            return roomResource
-          }
-
-          const createRoom = async (roomResource) => {
-            const params = {
-              TableName: TABLE_NAME,
-              Item: roomResource,
-            };
-            await dynamo.send(new PutCommand(params));
-          };
-
-          const getRoomById = async (roomId) => {
-            console.log("inside getRoomById: ", roomId);
-            const params = {
-              TableName: TABLE_NAME,
-              Key: { roomId },
-            };
-
-            const dataFromDatabase = await dynamo.send(new GetCommand(params));
-            console.log("dataFromDatabase: ", dataFromDatabase);
-            return dataFromDatabase.Item ? dataFromDatabase.Item : null;
-          };
-
-          const getRoomByName = async (name) => {
-            console.log(name);
-            const params = {
-              TableName: TABLE_NAME,
-              FilterExpression: "#unique = :name",
-              ExpressionAttributeValues: {
-                ":name": name,
-              },
-              ExpressionAttributeNames: { "#unique": "unique_name" },
-            };
-
-            const dataFromDatabase = await dynamo.send(new ScanCommand(params));
-            const item = dataFromDatabase.Items ? dataFromDatabase.Items[0] : null;
-
-            return item;
-          };
-
-          const getRoomResource = async (uniqueIdentifier) => {
-            let roomResource = null;
-            if (uniqueIdentifier) {
-              if (uniqueIdentifier.startsWith("rm_")) {
-                console.log("room starts with 'rm'");
-                roomResource = await getRoomById(uniqueIdentifier);
-              } else {
-                console.log("room name route");
-                roomResource = await getRoomByName(uniqueIdentifier);
-              }
-            }
-
-            return roomResource;
-          };
-
-          exports.handler = async (event) => {
-            let roomResource;
-            console.log(event)
-            try {
-              const config = event.body ? JSON.parse(event.body) : {};
-              const uniqueIdentifier = config.uniqueName;
-              // check whether the roomId/name exists or not
-              roomResource = await getRoomResource(uniqueIdentifier);
-              console.log("roomResource: ", roomResource);
-              // create the room if it doesn't exist
-              if (!roomResource || roomResource.roomId === undefined) {
-                const domain = "https://d37kkuvc3hzx41.cloudfront.net"
-                roomResource = constructRoomResource(config, domain)
-                await createRoom(roomResource);
-              }
-
-              return {
-                statusCode: 200,
-                headers: {
-                  "Access-Control-Allow-Headers": "Content-Type",
-                  "Access-Control-Allow-Origin": "*",
-                  "Access-Control-Allow-Methods": "OPTIONS,POST",
-                },
-                body: JSON.stringify(roomResource),
-              };
-            } catch (err) {
-              console.log(err);
-              return {
-                statusCode: 500,
-                body: JSON.stringify(
-                  createErrorResponse(
-                    "Error when getting or creating the new room. Please try again."
-                  )
-                ),
-              };
-            }
-          };
+        S3Bucket: !ImportValue LambdaBucketName
+        S3Key: create-room.zip
       Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
           table: !Ref RoomCountsTable2301
-      Handler: index.handler
+      Handler: app.lambdaHandler
       Runtime: nodejs18.x
     DependsOn:
       - LambdaDefaultPolicy2301
       - LambdaExecutionRole
-  stageDev:
+  AuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !ImportValue LambdaBucketName
+        S3Key: authorizer.zip
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Handler: app.lambdaHandler
+      Runtime: nodejs18.x
+    DependsOn:
+      - LambdaDefaultPolicy2301
+      - LambdaExecutionRole
+  StageV1:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
       ApiId: !Ref ApiGateway
-      StageName: dev
+      StageName: v1
       AutoDeploy: true
   HTTPAPIGetRoomsLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -692,15 +591,15 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt RoomsGetFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
-        - ''
-        - - 'arn:'
+      SourceArn: !Join
+        - ""
+        - - "arn:"
           - !Ref AWS::Partition
-          - ':execute-api:'
+          - ":execute-api:"
           - !Ref AWS::Region
-          - ':'
+          - ":"
           - !Ref AWS::AccountId
-          - ':'
+          - ":"
           - !Ref ApiGateway
           - /*/*
   HTTPAPICreateRoomLambdaPermission:
@@ -709,15 +608,15 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt CreateRoomFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
-        - ''
-        - - 'arn:'
+      SourceArn: !Join
+        - ""
+        - - "arn:"
           - !Ref AWS::Partition
-          - ':execute-api:'
+          - ":execute-api:"
           - !Ref AWS::Region
-          - ':'
+          - ":"
           - !Ref AWS::AccountId
-          - ':'
+          - ":"
           - !Ref ApiGateway
           - /*/*
   HTTPAPIGenerateCredentialsLambdaPermission:
@@ -726,15 +625,15 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt GenerateTurnCredentialsFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
-        - ''
-        - - 'arn:'
+      SourceArn: !Join
+        - ""
+        - - "arn:"
           - !Ref AWS::Partition
-          - ':execute-api:'
+          - ":execute-api:"
           - !Ref AWS::Region
-          - ':'
+          - ":"
           - !Ref AWS::AccountId
-          - ':'
+          - ":"
           - !Ref ApiGateway
           - /*/*
   HTTPAPIDefaultLambdaPermission:
@@ -743,17 +642,74 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt DefaultLambdaFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
-        - ''
-        - - 'arn:'
+      SourceArn: !Join
+        - ""
+        - - "arn:"
           - !Ref AWS::Partition
-          - ':execute-api:'
+          - ":execute-api:"
           - !Ref AWS::Region
-          - ':'
+          - ":"
           - !Ref AWS::AccountId
-          - ':'
+          - ":"
           - !Ref ApiGateway
           - /*/*
+  HTTPAPIKeyAuthorizerLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt AuthorizerFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref AWS::Partition
+          - ":execute-api:"
+          - !Ref AWS::Region
+          - ":"
+          - !Ref AWS::AccountId
+          - ":"
+          - !Ref ApiGateway
+          - /*/*
+  APIKeyAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      Name: APIKeyAuthorizer
+      ApiId: !Ref ApiGateway
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt AuthorizerFunction.Arn
+          - /invocations
+      AuthorizerResultTtlInSeconds: 300
+      AuthorizerPayloadFormatVersion: 2.0
+      EnableSimpleResponses: true
+      IdentitySource:
+        - $request.header.Authorization
+  APITokenAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      Name: APITokenAuthorizer
+      ApiId: !Ref ApiGateway
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt AuthorizerFunction.Arn
+          - /invocations
+      AuthorizerResultTtlInSeconds: 300
+      AuthorizerPayloadFormatVersion: 2.0
+      EnableSimpleResponses: true
+      IdentitySource:
+        - $request.querystring.token
 Outputs:
   APIGateWayEndpoint:
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/dev
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/v1

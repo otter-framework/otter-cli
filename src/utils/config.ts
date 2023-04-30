@@ -35,6 +35,11 @@ const schema = {
     type: "string",
     default: "",
   },
+
+  apiKey: {
+    type: "string",
+    default: "",
+  },
 };
 
 export const config = new Conf({

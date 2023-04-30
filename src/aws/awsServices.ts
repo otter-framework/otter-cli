@@ -14,24 +14,24 @@ import {
   ListCommandInvocationsCommand,
 } from "@aws-sdk/client-ssm";
 import {
-  S3,
+  S3Client,
   PutObjectCommand,
   ListBucketsCommand,
   ListObjectsCommand,
   DeleteObjectsCommand,
   ObjectIdentifier,
   DeleteObjectsCommandInput,
-  PutBucketPolicyCommand, 
+  PutBucketPolicyCommand,
   PutBucketPolicyCommandInput,
   PutPublicAccessBlockCommand,
 } from "@aws-sdk/client-s3";
+import { CloudFrontClient } from "@aws-sdk/client-cloudfront";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  CloudFrontClient,
-  UpdateDistributionCommand,
-  UpdateDistributionCommandInput,
-  ListDistributionsCommand,
-  GetDistributionConfigCommand,
-} from "@aws-sdk/client-cloudfront";
+  DynamoDBDocument,
+  PutCommand,
+  PutCommandInput,
+} from "@aws-sdk/lib-dynamodb";
 
 interface InterfaceAwsServices {
   provisionResources: (
@@ -45,18 +45,21 @@ interface InterfaceAwsServices {
 
 export class AwsServices implements InterfaceAwsServices {
   cloudFormationClient: CloudFormation;
-  s3Client: S3;
+  s3Client: S3Client;
   ec2Client: EC2;
   ssmClient: SSM;
   cloudfront: CloudFrontClient;
+  dynamo: DynamoDBDocument;
   checkInterval: number;
 
   constructor(credentials: AwsCredentialIdentity, region: string) {
     this.cloudFormationClient = new CloudFormation({ credentials, region });
-    this.s3Client = new S3({ credentials, region });
+    this.s3Client = new S3Client({ credentials, region });
     this.ec2Client = new EC2({ credentials, region });
     this.ssmClient = new SSM({ credentials, region });
     this.cloudfront = new CloudFrontClient({ credentials, region });
+    const db = new DynamoDBClient({ credentials, region });
+    this.dynamo = DynamoDBDocument.from(db);
     this.checkInterval = 3000;
   }
 
@@ -155,13 +158,16 @@ export class AwsServices implements InterfaceAwsServices {
     return endpoint;
   }
 
-  async uploadFile(): Promise<void> {
-    // Set the bucket and file name
-    const bucketName = await this.getConfigBucketName();
-    const fileName = "configs.js";
+  async uploadFile(
+    relativePath: string,
+    fileName: string,
+    bucketName: string
+  ): Promise<void> {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
 
     // Read the file to be uploaded
-    const fileContent = fs.readFileSync(fileName);
+    const fileContent = fs.readFileSync(path.join(__dirname, relativePath));
 
     const params = new PutObjectCommand({
       Bucket: bucketName,
@@ -177,6 +183,31 @@ export class AwsServices implements InterfaceAwsServices {
     }
   }
 
+  async getLambdaBucketName(): Promise<string> {
+    const data = await this.s3Client.send(new ListBucketsCommand({}));
+    const buckets = data.Buckets;
+    if (buckets && buckets.length === 0) return "";
+    const lambdaBuckets = buckets?.filter((bucket) =>
+      bucket.Name?.startsWith("s3lambda")
+    );
+    if (lambdaBuckets && lambdaBuckets.length === 0) return "";
+    let target = lambdaBuckets?.[0];
+    let newestTime = lambdaBuckets?.[0].CreationDate;
+    lambdaBuckets?.forEach((bucket) => {
+      if (
+        bucket.CreationDate &&
+        newestTime &&
+        bucket.CreationDate > newestTime
+      ) {
+        target = bucket;
+      }
+    });
+
+    if (target?.Name) return target?.Name;
+
+    return "";
+  }
+
   async changeBucketPublicAccess(): Promise<void> {
     const reactBucketName = await this.getReactBucketName();
     const configBucketName = await this.getConfigBucketName();
@@ -187,7 +218,7 @@ export class AwsServices implements InterfaceAwsServices {
       BlockPublicPolicy: false,
       RestrictPublicBuckets: false,
     };
-    
+
     const reactBucketParams = {
       Bucket: reactBucketName,
       PublicAccessBlockConfiguration: blockPublicAccessSettings,
@@ -197,8 +228,13 @@ export class AwsServices implements InterfaceAwsServices {
       Bucket: configBucketName,
       PublicAccessBlockConfiguration: blockPublicAccessSettings,
     };
-    await this.s3Client.putPublicAccessBlock(reactBucketParams);
-    await this.s3Client.putPublicAccessBlock(configBucketParams); 
+
+    const reactCommand = new PutPublicAccessBlockCommand(reactBucketParams);
+    const configCommand = new PutPublicAccessBlockCommand(configBucketParams);
+
+    await this.s3Client.send(reactCommand);
+
+    await this.s3Client.send(configCommand);
   }
 
   async addBucketPolicy(): Promise<void> {
@@ -245,11 +281,13 @@ export class AwsServices implements InterfaceAwsServices {
 
     await this.s3Client.send(reactCommand);
 
-    await this.s3Client.send(configCommand)
+    await this.s3Client.send(configCommand);
   }
 
   async getConfigBucketName(): Promise<string> {
-    const data = await this.s3Client.send(new ListBucketsCommand({}));
+    const input = {};
+    const command = new ListBucketsCommand(input);
+    const data = await this.s3Client.send(command);
     const buckets = data.Buckets;
     if (buckets && buckets.length === 0) return "";
     const configBuckets = buckets?.filter((bucket) =>
@@ -298,22 +336,22 @@ export class AwsServices implements InterfaceAwsServices {
     return "";
   }
 
-  async deleteS3ConfigBucket(): Promise<void> {
-    const bucketName = await this.getConfigBucketName();
-  
-    // Delete all objects within the bucket
-    const objects = await this.s3Client.listObjectsV2({ Bucket: bucketName });
-    if (objects.Contents) {
-      const deleteParams = {
-        Bucket: bucketName,
-        Delete: { Objects: objects.Contents.map(({ Key }) => ({ Key })) },
-      };
-      await this.s3Client.deleteObjects(deleteParams);
-    }
-  
-    // Delete the bucket
-    await this.s3Client.deleteBucket({ Bucket: bucketName });
-  }
+  // async deleteS3ConfigBucket(): Promise<void> {
+  //   const bucketName = await this.getConfigBucketName();
+
+  //   // Delete all objects within the bucket
+  //   const objects = await this.s3Client.listObjectsV2({ Bucket: bucketName });
+  //   if (objects.Contents) {
+  //     const deleteParams = {
+  //       Bucket: bucketName,
+  //       Delete: { Objects: objects.Contents.map(({ Key }) => ({ Key })) },
+  //     };
+  //     await this.s3Client.deleteObjects(deleteParams);
+  //   }
+
+  //   // Delete the bucket
+  //   await this.s3Client.deleteBucket({ Bucket: bucketName });
+  // }
 
   async sendEC2Commands(instanceId: string): Promise<void> {
     const configBucketName = await this.getConfigBucketName();
@@ -336,7 +374,7 @@ export class AwsServices implements InterfaceAwsServices {
         // `export NVM_DIR="$HOME/.nvm" [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"`,
         // "sudo nvm install --lts",
         "curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s lts",
-        "git clone https://github.com/otter-framework/otter-client",
+        "git clone -b chris https://github.com/otter-framework/otter-client",
         `location=$(find / -type d -name "otter-client")`,
         "cd $location",
         "npm i",
@@ -389,10 +427,12 @@ export class AwsServices implements InterfaceAwsServices {
   }
 
   async emptyBuckets() {
-    const configBucketName = await this.getConfigBucketName();
+    // const configBucketName = await this.getConfigBucketName();
     const reactBucketName = await this.getReactBucketName();
-    if (configBucketName) await this.emptyBucket(configBucketName);
+    const lambdaBucketName = await this.getLambdaBucketName();
+    // if (configBucketName) await this.emptyBucket(configBucketName);
     if (reactBucketName) await this.emptyBucket(reactBucketName);
+    if (lambdaBucketName) await this.emptyBucket(lambdaBucketName);
   }
 
   async emptyBucket(bucket: string) {
@@ -415,43 +455,22 @@ export class AwsServices implements InterfaceAwsServices {
     }
   }
 
-  async updateCloudFrontDomain(domain: string) {
-    const response = await this.cloudfront.send(
-      new ListDistributionsCommand({})
-    );
-    const id = response.DistributionList?.Items?.[0].Id;
-    console.log("CF id: ", id);
-    const distributionConfigResponse = await this.cloudfront.send(
-      new GetDistributionConfigCommand({ Id: id })
-    );
-    const distributionConfig = distributionConfigResponse.DistributionConfig;
-    const etag = distributionConfigResponse.ETag;
-    console.log("DConfig: ", distributionConfig);
-    const origin = distributionConfig?.Origins?.Items?.[0];
-    console.log("origin: ", origin);
-    if (origin) {
-      origin.DomainName =
-        "cloudfrontstack-s3bucket-1fauf2jcmbv9l.s3-website.us-east-2.amazonaws.com";
-      origin.CustomOriginConfig = {
-        HTTPPort: 80,
-        HTTPSPort: 443,
-        OriginProtocolPolicy: "http-only",
-        OriginSslProtocols: {
-          Quantity: 3,
-          Items: ["TLSv1", "TLSv1.1", "TLSv1.2"],
-        },
-        OriginReadTimeout: 30,
-        OriginKeepaliveTimeout: 5,
-      };
-      delete origin.S3OriginConfig;
-    }
-    console.log("new origin: ", origin);
-    const params: UpdateDistributionCommandInput = {
-      Id: id,
-      DistributionConfig: distributionConfig,
-      IfMatch: etag,
+  async saveApiKeyToDynamo(apiKey: string) {
+    const params: PutCommandInput = {
+      TableName: "APIKeyTable",
+      Item: { user: "otter-admin", apiKey },
     };
-    await this.cloudfront.send(new UpdateDistributionCommand(params));
+
+    const result = await this.dynamo.send(new PutCommand(params));
+  }
+
+  async saveDomainToDynamo(domain: string) {
+    const params: PutCommandInput = {
+      TableName: "ConfigTable",
+      Item: { user: "otter-admin", domain },
+    };
+
+    const result = await this.dynamo.send(new PutCommand(params));
   }
 
   // private methods below

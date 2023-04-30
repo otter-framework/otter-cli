@@ -29,19 +29,7 @@ const selectRegionQuestion: DistinctQuestion = {
   type: "list",
   name: "region",
   message: "Please select a region to provision/access your resources: ",
-  choices: [
-    "us-east-1",
-    "us-east-2",
-    "us-west-1",
-    "us-west-2",
-    "eu-west-1",
-    "eu-west-2",
-    "eu-west-3",
-    "eu-central-1",
-    "eu-central-2",
-    "ap-southeast-1",
-    "ap-southeast-2",
-  ],
+  choices: ["us-east-1", "us-east-2", "us-west-1", "us-west-2"],
 };
 
 export const GetAwsInfo = async (): Promise<Answers> => {
@@ -50,7 +38,7 @@ export const GetAwsInfo = async (): Promise<Answers> => {
   // if valid local AWS credentials are found, save it to config
   if (Object.keys(localAwsCredentials).length > 0) {
     const credentials = localAwsCredentials as AwsCredentialIdentity;
-    ui.success("Local AWS credentials found.");
+    ui.success("  Local AWS credentials found.");
     config.set({
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
@@ -65,7 +53,7 @@ export const GetAwsInfo = async (): Promise<Answers> => {
   const region = config.get("region") as string;
 
   if (region) {
-    ui.display(`Your region: ${ui.highlight(region)}\n`);
+    ui.display(`  Your region: ${ui.highlight(region)}\n`);
     preAnswered["region"] = region;
   }
 
