@@ -164,7 +164,7 @@ const tasks = new Listr([
       // Send commands to EC2 to build react app
       await aws.sendEC2Commands(EC2InstanceId);
       await aws.destroyResources(ec2Stack.name);
-      await aws.deleteS3ConfigBucket();
+      // await aws.deleteS3ConfigBucket();
       task.title = "Otter Video App is ready to go.";
     },
   },

@@ -7,25 +7,25 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: "AES256"
-      AccessControl: PublicRead
+      # AccessControl: PublicRead
 
-  LambdaBucketPolicy:
-    Type: "AWS::S3::BucketPolicy"
-    Properties:
-      Bucket: !Ref LambdaBucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: "*"
-            Action:
-              - "s3:GetObject"
-              - "s3:PutObject"
-            Resource: !Join
-              - ""
-              - - "arn:aws:s3:::"
-                - !Ref LambdaBucket
-                - /*
+  # LambdaBucketPolicy:
+  #   Type: "AWS::S3::BucketPolicy"
+  #   Properties:
+  #     Bucket: !Ref LambdaBucket
+  #     PolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal: "*"
+  #           Action:
+  #             - "s3:GetObject"
+  #             - "s3:PutObject"
+  #           Resource: !Join
+  #             - ""
+  #             - - "arn:aws:s3:::"
+  #               - !Ref LambdaBucket
+  #               - /*
 Outputs:
   LambdaBucketName:
     Value: !Ref LambdaBucket

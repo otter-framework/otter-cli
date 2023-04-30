@@ -14,7 +14,7 @@ import {
   ListCommandInvocationsCommand,
 } from "@aws-sdk/client-ssm";
 import {
-  S3,
+  S3Client,
   PutObjectCommand,
   ListBucketsCommand,
   ListObjectsCommand,
@@ -45,7 +45,7 @@ interface InterfaceAwsServices {
 
 export class AwsServices implements InterfaceAwsServices {
   cloudFormationClient: CloudFormation;
-  s3Client: S3;
+  s3Client: S3Client;
   ec2Client: EC2;
   ssmClient: SSM;
   cloudfront: CloudFrontClient;
@@ -54,7 +54,7 @@ export class AwsServices implements InterfaceAwsServices {
 
   constructor(credentials: AwsCredentialIdentity, region: string) {
     this.cloudFormationClient = new CloudFormation({ credentials, region });
-    this.s3Client = new S3({ credentials, region });
+    this.s3Client = new S3Client({ credentials, region });
     this.ec2Client = new EC2({ credentials, region });
     this.ssmClient = new SSM({ credentials, region });
     this.cloudfront = new CloudFrontClient({ credentials, region });
@@ -228,8 +228,13 @@ export class AwsServices implements InterfaceAwsServices {
       Bucket: configBucketName,
       PublicAccessBlockConfiguration: blockPublicAccessSettings,
     };
-    await this.s3Client.putPublicAccessBlock(reactBucketParams);
-    await this.s3Client.putPublicAccessBlock(configBucketParams);
+
+    const reactCommand = new PutPublicAccessBlockCommand(reactBucketParams);
+    const configCommand = new PutPublicAccessBlockCommand(configBucketParams);
+
+    await this.s3Client.send(reactCommand);
+
+    await this.s3Client.send(configCommand);
   }
 
   async addBucketPolicy(): Promise<void> {
@@ -280,7 +285,9 @@ export class AwsServices implements InterfaceAwsServices {
   }
 
   async getConfigBucketName(): Promise<string> {
-    const data = await this.s3Client.send(new ListBucketsCommand({}));
+    const input = {};
+    const command = new ListBucketsCommand(input);
+    const data = await this.s3Client.send(command);
     const buckets = data.Buckets;
     if (buckets && buckets.length === 0) return "";
     const configBuckets = buckets?.filter((bucket) =>
@@ -329,22 +336,22 @@ export class AwsServices implements InterfaceAwsServices {
     return "";
   }
 
-  async deleteS3ConfigBucket(): Promise<void> {
-    const bucketName = await this.getConfigBucketName();
+  // async deleteS3ConfigBucket(): Promise<void> {
+  //   const bucketName = await this.getConfigBucketName();
 
-    // Delete all objects within the bucket
-    const objects = await this.s3Client.listObjectsV2({ Bucket: bucketName });
-    if (objects.Contents) {
-      const deleteParams = {
-        Bucket: bucketName,
-        Delete: { Objects: objects.Contents.map(({ Key }) => ({ Key })) },
-      };
-      await this.s3Client.deleteObjects(deleteParams);
-    }
+  //   // Delete all objects within the bucket
+  //   const objects = await this.s3Client.listObjectsV2({ Bucket: bucketName });
+  //   if (objects.Contents) {
+  //     const deleteParams = {
+  //       Bucket: bucketName,
+  //       Delete: { Objects: objects.Contents.map(({ Key }) => ({ Key })) },
+  //     };
+  //     await this.s3Client.deleteObjects(deleteParams);
+  //   }
 
-    // Delete the bucket
-    await this.s3Client.deleteBucket({ Bucket: bucketName });
-  }
+  //   // Delete the bucket
+  //   await this.s3Client.deleteBucket({ Bucket: bucketName });
+  // }
 
   async sendEC2Commands(instanceId: string): Promise<void> {
     const configBucketName = await this.getConfigBucketName();
