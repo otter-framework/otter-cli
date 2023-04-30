@@ -17,7 +17,7 @@
 - `otter status`: Health check all components and show the results
 - `otter config`: Display configuration file location (and maybe allow user to change them through cli)
 - `otter` and `otter --help`: Show introduction and help info
-- If Otter is deployed and user try to `otter deploy` again, we could do:
+- If Otter is deployed and user tries to `otter deploy` again, we could do:
 
   - create a cloudformation changeset and deploy it, or
   - ask user to `destroy` first before running `deploy` again
