@@ -113,6 +113,15 @@ const tasks = new Listr([
     },
   },
   {
+    title: ui.secondary("Modifying S3 permissions"),
+    task: async (_, task) => {
+      task.title = "Modifying S3 permissions";
+      await aws.changeBucketPublicAccess();
+      await aws.addBucketPolicy();
+      task.title = "S3 Buckets successfully changed.";
+    },
+  },
+  {
     title: ui.secondary("Gather resource information"),
     task: async (_, task) => {
       task.title = "Gather resource information";
